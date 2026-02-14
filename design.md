@@ -295,7 +295,7 @@ Target:
 
 ## 9. Cost Optimization
 
-Design optimized for <₹1/user/month at 10K users.
+Design optimized for <₹5/user/month at 10K users.
 
 Strategies:
 
