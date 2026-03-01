@@ -1,0 +1,576 @@
+{
+  "schemes": [
+    {
+      "scheme_id": "lakshmir_bhandar",
+      "scheme_name": "Lakshmir Bhandar",
+      "scheme_name_bn": "লক্ষ্মীর ভান্ডার",
+      "department": "Women & Child Development Department, WB",
+      "tag": "WOMEN",
+      "benefit_display": "₹1,000–₹1,200/month",
+      "benefits": {
+        "general_monthly": 1000,
+        "sc_st_monthly": 1200,
+        "mode": "DBT",
+        "note": "SC/ST women receive ₹1,200/month with valid caste certificate. General category receives ₹1,000/month. Bank account must be active and Aadhaar linked."
+      },
+      "eligibility": {
+        "gender": "female",
+        "age_min": 25,
+        "age_max": 60,
+        "state_resident": true,
+        "not_govt_employee": true,
+        "not_income_tax_payer": true,
+        "not_enrolled_in_other_cash_scheme": true
+      },
+      "documents": [
+        {
+          "doc_id": "aadhaar",
+          "label": "Aadhaar Card",
+          "label_bn": "আধার কার্ড",
+          "required": true,
+          "score_deduction_if_missing": 20
+        },
+        {
+          "doc_id": "voter_id",
+          "label": "Voter ID (EPIC)",
+          "label_bn": "ভোটার কার্ড",
+          "required": true,
+          "score_deduction_if_missing": 15
+        },
+        {
+          "doc_id": "bank_passbook",
+          "label": "Bank Passbook",
+          "label_bn": "ব্যাংক পাসবুক",
+          "required": true,
+          "score_deduction_if_missing": 20,
+          "note": "Account must not be dormant or frozen"
+        },
+        {
+          "doc_id": "caste_certificate",
+          "label": "Caste Certificate",
+          "label_bn": "জাতি শংসাপত্র",
+          "required": false,
+          "score_deduction_if_missing": 0,
+          "note": "Required only for SC/ST higher benefit tier"
+        }
+      ],
+      "mismatch_checks": [
+        {
+          "check_id": "name_aadhaar_bank",
+          "field": "name",
+          "doc_a": "aadhaar",
+          "doc_b": "bank_passbook",
+          "label_a": "Aadhaar",
+          "label_b": "Bank Passbook",
+          "severity": "FATAL",
+          "score_deduction": 35,
+          "script_code": "NAME_MISMATCH",
+          "message": "Name on Aadhaar must exactly match Bank Passbook or DBT may fail."
+        },
+        {
+          "check_id": "name_aadhaar_voter",
+          "field": "name",
+          "doc_a": "aadhaar",
+          "doc_b": "voter_id",
+          "label_a": "Aadhaar",
+          "label_b": "Voter ID",
+          "severity": "WARNING",
+          "score_deduction": 15,
+          "script_code": "NAME_MISMATCH",
+          "message": "Minor name mismatch may delay field verification."
+        }
+      ],
+      "bank_conditions": {
+        "account_required": true,
+        "aadhaar_linked_required": true,
+        "dormant_check": true,
+        "dormant_threshold_months": 6,
+        "score_deduction_dormant": 25,
+        "score_deduction_unlinked": 25,
+        "script_code_dormant": "DORMANT_ACCOUNT",
+        "script_code_unlinked": "AADHAAR_UNLINKED"
+      },
+      "cross_scheme_triggers": [
+        {
+          "condition": "has_daughter_13_19",
+          "suggest_scheme_id": "kanyashree",
+          "reason": "Daughter may qualify for Kanyashree ₹25,000 grant."
+        },
+        {
+          "condition": "always",
+          "suggest_scheme_id": "swasthya_sathi",
+          "reason": "Family may qualify for ₹5 lakh health cover."
+        }
+      ]
+    },
+    {
+      "scheme_id": "swasthya_sathi",
+      "scheme_name": "Swasthya Sathi",
+      "scheme_name_bn": "স্বাস্থ্য সাথী",
+      "department": "Health & Family Welfare Department, WB",
+      "tag": "HEALTH",
+      "benefit_display": "₹5 lakh health cover/year",
+      "benefits": {
+        "cashless_limit": 500000,
+        "mode": "Cashless Smart Card",
+        "note": "Covers entire family. Smart card issued in the name of female head of household."
+      },
+      "eligibility": {
+        "gender": null,
+        "age_min": null,
+        "age_max": null,
+        "state_resident": true,
+        "not_govt_employee": false,
+        "not_income_tax_payer": false,
+        "not_enrolled_in_other_cash_scheme": false
+      },
+      "documents": [
+        {
+          "doc_id": "ration_card",
+          "label": "Ration Card",
+          "label_bn": "রেশন কার্ড",
+          "required": true,
+          "score_deduction_if_missing": 20
+        },
+        {
+          "doc_id": "aadhaar",
+          "label": "Aadhaar Card",
+          "label_bn": "আধার কার্ড",
+          "required": true,
+          "score_deduction_if_missing": 15
+        },
+        {
+          "doc_id": "mobile_number",
+          "label": "Active Mobile Number",
+          "label_bn": "মোবাইল নম্বর",
+          "required": true,
+          "score_deduction_if_missing": 10,
+          "note": "OTP verification required"
+        }
+      ],
+      "mismatch_checks": [
+        {
+          "check_id": "name_aadhaar_ration",
+          "field": "name",
+          "doc_a": "aadhaar",
+          "doc_b": "ration_card",
+          "label_a": "Aadhaar",
+          "label_b": "Ration Card",
+          "severity": "WARNING",
+          "score_deduction": 10,
+          "script_code": "NAME_MISMATCH",
+          "message": "Name mismatch may delay smart card generation."
+        }
+      ],
+      "bank_conditions": {
+        "account_required": false,
+        "aadhaar_linked_required": false,
+        "dormant_check": false,
+        "dormant_threshold_months": null,
+        "score_deduction_dormant": 0,
+        "score_deduction_unlinked": 0,
+        "script_code_dormant": null,
+        "script_code_unlinked": null
+      },
+      "cross_scheme_triggers": [
+        {
+          "condition": "female_25_60",
+          "suggest_scheme_id": "lakshmir_bhandar",
+          "reason": "Female members may qualify for Lakshmir Bhandar monthly DBT."
+        }
+      ]
+    },
+    {
+      "scheme_id": "kanyashree",
+      "scheme_name": "Kanyashree Prakalpa",
+      "scheme_name_bn": "কন্যাশ্রী প্রকল্প",
+      "department": "Women & Child Development Department, WB",
+      "tag": "EDUCATION",
+      "benefit_display": "₹1,000/yr + ₹25,000 one-time",
+      "benefits": {
+        "k1_annual": 1000,
+        "k2_onetime": 25000,
+        "mode": "DBT",
+        "note": "K1 annual scholarship and K2 ₹25,000 grant at 18 if unmarried and in education."
+      },
+      "eligibility": {
+        "gender": "female",
+        "age_min": 13,
+        "age_max": 19,
+        "state_resident": true,
+        "must_be_enrolled_in_school": true,
+        "must_be_unmarried": true
+      },
+      "documents": [
+        {
+          "doc_id": "birth_certificate",
+          "label": "Birth Certificate",
+          "label_bn": "জন্ম শংসাপত্র",
+          "required": true,
+          "score_deduction_if_missing": 20
+        },
+        {
+          "doc_id": "school_certificate",
+          "label": "School Enrollment Certificate",
+          "label_bn": "স্কুল শংসাপত্র",
+          "required": true,
+          "score_deduction_if_missing": 20
+        },
+        {
+          "doc_id": "bank_passbook",
+          "label": "Bank Account (Girl's Name)",
+          "label_bn": "ব্যাংক অ্যাকাউন্ট",
+          "required": true,
+          "score_deduction_if_missing": 20
+        }
+      ],
+      "mismatch_checks": [
+        {
+          "check_id": "dob_birth_aadhaar",
+          "field": "date_of_birth",
+          "doc_a": "birth_certificate",
+          "doc_b": "aadhaar",
+          "label_a": "Birth Certificate",
+          "label_b": "Aadhaar",
+          "severity": "FATAL",
+          "score_deduction": 30,
+          "script_code": "DOB_MISMATCH",
+          "message": "DOB must match across documents or scholarship may be rejected."
+        }
+      ],
+      "bank_conditions": {
+        "account_required": true,
+        "aadhaar_linked_required": true,
+        "dormant_check": true,
+        "dormant_threshold_months": 6,
+        "score_deduction_dormant": 20,
+        "score_deduction_unlinked": 20,
+        "script_code_dormant": "DORMANT_ACCOUNT",
+        "script_code_unlinked": "AADHAAR_UNLINKED"
+      },
+      "cross_scheme_triggers": [
+        {
+          "condition": "mother_25_60",
+          "suggest_scheme_id": "lakshmir_bhandar",
+          "reason": "Mother may qualify for Lakshmir Bhandar benefit."
+        }
+      ]
+    },
+    {
+      "scheme_id": "krishak_bandhu",
+      "scheme_name": "Krishak Bandhu",
+      "scheme_name_bn": "কৃষক বন্ধু",
+      "department": "Agriculture Department, WB",
+      "tag": "FARMER",
+      "benefit_display": "₹4,000–₹10,000/year + Insurance",
+      "benefits": {
+        "yearly_assistance": 10000,
+        "death_benefit": 200000,
+        "mode": "DBT",
+        "note": "Financial support based on land area + ₹2 lakh death insurance for farmers."
+      },
+      "eligibility": {
+        "gender": null,
+        "age_min": 18,
+        "age_max": 60,
+        "state_resident": true,
+        "must_be_farmer": true,
+        "must_have_land_record": true
+      },
+      "documents": [
+        {
+          "doc_id": "land_record",
+          "label": "Land Record (Porcha)",
+          "label_bn": "জমির নথি",
+          "required": true,
+          "score_deduction_if_missing": 30
+        },
+        {
+          "doc_id": "aadhaar",
+          "label": "Aadhaar Card",
+          "label_bn": "আধার কার্ড",
+          "required": true,
+          "score_deduction_if_missing": 20
+        },
+        {
+          "doc_id": "bank_passbook",
+          "label": "Bank Passbook",
+          "label_bn": "ব্যাংক পাসবুক",
+          "required": true,
+          "score_deduction_if_missing": 20
+        }
+      ],
+      "mismatch_checks": [
+        {
+          "check_id": "name_land_aadhaar",
+          "field": "name",
+          "doc_a": "land_record",
+          "doc_b": "aadhaar",
+          "label_a": "Land Record",
+          "label_b": "Aadhaar",
+          "severity": "FATAL",
+          "score_deduction": 40,
+          "script_code": "LAND_NAME_MISMATCH",
+          "message": "Farmer name on land record must match Aadhaar exactly."
+        }
+      ],
+      "bank_conditions": {
+        "account_required": true,
+        "aadhaar_linked_required": true,
+        "dormant_check": true,
+        "dormant_threshold_months": 6,
+        "score_deduction_dormant": 30,
+        "score_deduction_unlinked": 25,
+        "script_code_dormant": "DORMANT_ACCOUNT",
+        "script_code_unlinked": "AADHAAR_UNLINKED"
+      },
+      "cross_scheme_triggers": []
+    },
+    {
+      "scheme_id": "rupashree",
+      "scheme_name": "Rupashree Prakalpa",
+      "scheme_name_bn": "রূপশ্রী প্রকল্প",
+      "department": "Women & Child Development Department, WB",
+      "tag": "MARRIAGE",
+      "benefit_display": "₹25,000 one-time grant",
+      "benefits": {
+        "one_time_grant": 25000,
+        "mode": "DBT",
+        "note": "Marriage assistance for economically weaker families. Bride must be 18+."
+      },
+      "eligibility": {
+        "gender": "female",
+        "age_min": 18,
+        "age_max": 40,
+        "state_resident": true,
+        "family_income_max": 150000
+      },
+      "documents": [
+        {
+          "doc_id": "age_proof",
+          "label": "Age Proof",
+          "label_bn": "বয়সের প্রমাণ",
+          "required": true,
+          "score_deduction_if_missing": 25
+        },
+        {
+          "doc_id": "income_certificate",
+          "label": "Income Certificate",
+          "label_bn": "আয় শংসাপত্র",
+          "required": true,
+          "score_deduction_if_missing": 25
+        },
+        {
+          "doc_id": "bank_passbook",
+          "label": "Bank Passbook (Bride)",
+          "label_bn": "ব্যাংক পাসবুক",
+          "required": true,
+          "score_deduction_if_missing": 20
+        }
+      ],
+      "mismatch_checks": [
+        {
+          "check_id": "dob_aadhaar_age",
+          "field": "date_of_birth",
+          "doc_a": "aadhaar",
+          "doc_b": "age_proof",
+          "label_a": "Aadhaar",
+          "label_b": "Age Proof",
+          "severity": "FATAL",
+          "score_deduction": 30,
+          "script_code": "DOB_MISMATCH",
+          "message": "Bride must be 18+ and DOB must match documents."
+        }
+      ],
+      "bank_conditions": {
+        "account_required": true,
+        "aadhaar_linked_required": true,
+        "dormant_check": true,
+        "dormant_threshold_months": 6,
+        "score_deduction_dormant": 25,
+        "score_deduction_unlinked": 25,
+        "script_code_dormant": "DORMANT_ACCOUNT",
+        "script_code_unlinked": "AADHAAR_UNLINKED"
+      },
+      "cross_scheme_triggers": []
+    },
+    {
+      "scheme_id": "samajik_suraksha",
+      "scheme_name": "Samajik Suraksha Yojana",
+      "scheme_name_bn": "সমাজিক সুরক্ষা যোজনা",
+      "department": "Social Welfare Department, WB",
+      "tag": "PENSION",
+      "benefit_display": "₹1,000/month pension",
+      "benefits": {
+        "monthly_pension": 1000,
+        "mode": "DBT",
+        "note": "Pension for elderly, widows and disabled citizens."
+      },
+      "eligibility": {
+        "gender": null,
+        "age_min": 60,
+        "age_max": null,
+        "state_resident": true,
+        "low_income": true
+      },
+      "documents": [
+        {
+          "doc_id": "age_proof",
+          "label": "Age Proof",
+          "label_bn": "বয়সের প্রমাণ",
+          "required": true,
+          "score_deduction_if_missing": 25
+        },
+        {
+          "doc_id": "bank_passbook",
+          "label": "Bank Passbook",
+          "label_bn": "ব্যাংক পাসবুক",
+          "required": true,
+          "score_deduction_if_missing": 20
+        }
+      ],
+      "mismatch_checks": [],
+      "bank_conditions": {
+        "account_required": true,
+        "aadhaar_linked_required": true,
+        "dormant_check": true,
+        "dormant_threshold_months": 6,
+        "score_deduction_dormant": 25,
+        "score_deduction_unlinked": 20,
+        "script_code_dormant": "DORMANT_ACCOUNT",
+        "script_code_unlinked": "AADHAAR_UNLINKED"
+      },
+      "cross_scheme_triggers": []
+    },
+    {
+      "scheme_id": "taruner_swapna",
+      "scheme_name": "Taruner Swapna",
+      "scheme_name_bn": "তরুণের স্বপ্ন",
+      "department": "School Education Department, WB",
+      "tag": "STUDENT",
+      "benefit_display": "Free Tablet/Device",
+      "benefits": {
+        "device": "Free Tablet",
+        "mode": "In-Kind",
+        "note": "Free tablet for Class XI and XII students in govt/aided schools."
+      },
+      "eligibility": {
+        "gender": null,
+        "age_min": 16,
+        "age_max": 19,
+        "state_resident": true,
+        "must_be_student_class_11_12": true
+      },
+      "documents": [
+        {
+          "doc_id": "school_id",
+          "label": "School ID",
+          "label_bn": "স্কুল আইডি",
+          "required": true,
+          "score_deduction_if_missing": 25
+        }
+      ],
+      "mismatch_checks": [],
+      "bank_conditions": {
+        "account_required": false,
+        "aadhaar_linked_required": false,
+        "dormant_check": false,
+        "dormant_threshold_months": null,
+        "score_deduction_dormant": 0,
+        "score_deduction_unlinked": 0,
+        "script_code_dormant": null,
+        "script_code_unlinked": null
+      },
+      "cross_scheme_triggers": []
+    },
+    {
+      "scheme_id": "lokprasar_prakalpo",
+      "scheme_name": "Lokprasar Prakalpo",
+      "scheme_name_bn": "লোকপ্রসার প্রকল্প",
+      "department": "Information & Cultural Affairs, WB",
+      "tag": "ARTIST",
+      "benefit_display": "Monthly honorarium",
+      "benefits": {
+        "monthly_honorarium": 1000,
+        "mode": "DBT",
+        "note": "Financial support for registered folk artists."
+      },
+      "eligibility": {
+        "gender": null,
+        "age_min": 18,
+        "age_max": null,
+        "state_resident": true,
+        "must_be_registered_artist": true
+      },
+      "documents": [
+        {
+          "doc_id": "artist_certificate",
+          "label": "Artist Registration Certificate",
+          "label_bn": "শিল্পী শংসাপত্র",
+          "required": true,
+          "score_deduction_if_missing": 30
+        },
+        {
+          "doc_id": "bank_passbook",
+          "label": "Bank Passbook",
+          "label_bn": "ব্যাংক পাসবুক",
+          "required": true,
+          "score_deduction_if_missing": 20
+        }
+      ],
+      "mismatch_checks": [],
+      "bank_conditions": {
+        "account_required": true,
+        "aadhaar_linked_required": true,
+        "dormant_check": true,
+        "dormant_threshold_months": 6,
+        "score_deduction_dormant": 20,
+        "score_deduction_unlinked": 20,
+        "script_code_dormant": "DORMANT_ACCOUNT",
+        "script_code_unlinked": "AADHAAR_UNLINKED"
+      },
+      "cross_scheme_triggers": []
+    },
+    {
+      "scheme_id": "karmashree",
+      "scheme_name": "Karmashree",
+      "scheme_name_bn": "কর্মশ্রী",
+      "department": "Rural Development Department, WB",
+      "tag": "EMPLOYMENT",
+      "benefit_display": "Rural wage employment",
+      "benefits": {
+        "mode": "Wage Support",
+        "note": "Provides rural employment opportunities under state programs."
+      },
+      "eligibility": {
+        "gender": null,
+        "age_min": 18,
+        "age_max": 60,
+        "state_resident": true,
+        "rural_resident": true,
+        "unemployed": true
+      },
+      "documents": [
+        {
+          "doc_id": "job_card",
+          "label": "Job Card / ID Proof",
+          "label_bn": "জব কার্ড",
+          "required": true,
+          "score_deduction_if_missing": 25
+        }
+      ],
+      "mismatch_checks": [],
+      "bank_conditions": {
+        "account_required": true,
+        "aadhaar_linked_required": true,
+        "dormant_check": true,
+        "dormant_threshold_months": 6,
+        "score_deduction_dormant": 20,
+        "score_deduction_unlinked": 20,
+        "script_code_dormant": "DORMANT_ACCOUNT",
+        "script_code_unlinked": "AADHAAR_UNLINKED"
+      },
+      "cross_scheme_triggers": []
+    }
+  ]
+}

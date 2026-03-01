@@ -1,0 +1,55 @@
+{
+  "NAME_MISMATCH": {
+    "where": "Bank Branch or Post Office / Aadhaar Centre",
+    "form": "KYC Update Form / Aadhaar Correction Form",
+    "en": "Go to the bank counter and say: 'My name on Aadhaar is {aadhaar_name}, but my bank passbook shows {bank_name}. I want to update my KYC as per my Aadhaar card. Please give me the form.' Bring your original Aadhaar card and passbook.",
+    "bn": "Bank-er counter-e jaao ebong bolo: 'Amar Aadhaar-e naam {aadhaar_name}, kintu bank passbook-e {bank_name} lekha ache. Aadhaar onujayi amar KYC update korte chai. Form-ta deben please.' Original Aadhaar card ebong passbook niye jaao.",
+    "hi": "Bank counter par jaiye aur boliye: 'Mera Aadhaar mein naam {aadhaar_name} hai, lekin bank passbook mein {bank_name} likha hai. Main apna KYC Aadhaar ke anusaar update karna chahta/chahti hoon. Form dijiye please.' Apna original Aadhaar aur passbook saath le jaiye.",
+    "audio_url": null
+  },
+
+  "DORMANT_ACCOUNT": {
+    "where": "Your Bank Branch",
+    "form": "Account Reactivation Request / Dormant Account Activation Form",
+    "en": "Go to your bank branch and say: 'My account has become dormant due to no transactions. I want to reactivate it. What do I need to do?' Make any small deposit or withdrawal (even ₹1) to reactivate. Bring your passbook and Aadhaar.",
+    "bn": "Aapnar bank branch-e jaao ebong bolo: 'Amar account-ta transaction na howar karone dormant hoye geche. Eta reactivate korte chai. Ki korte hobe?' Jebhabe bole seta koro — ekta choto deposit ba withdrawal (₹1 o cholbe) korle account active hobe. Passbook ebong Aadhaar niye jaao.",
+    "hi": "Apni bank branch mein jaiye aur boliye: 'Mera account transactions na hone ki wajah se dormant ho gaya hai. Ise reactivate karna chahta/chahti hoon. Kya karna hoga?' Koi bhi chhoti deposit ya withdrawal (₹1 bhi chalega) se account active ho jayega. Passbook aur Aadhaar saath le jaiye.",
+    "audio_url": null
+  },
+
+  "AADHAAR_UNLINKED": {
+    "where": "Your Bank Branch (bring Aadhaar card)",
+    "form": "Aadhaar Seeding Form / DBT Linkage Form",
+    "en": "Go to your bank branch with your Aadhaar card and say: 'I want to link my Aadhaar number to my bank account for DBT — Direct Benefit Transfer. Please give me the Aadhaar seeding form.' This is required to receive government benefits directly.",
+    "bn": "Aadhaar card niye bank branch-e jaao ebong bolo: 'DBT — Direct Benefit Transfer-er jonyo amar Aadhaar number-ta bank account-er sathe link korte chai. Aadhaar seeding form-ta deben please.' Sarkar-er benefit directly pete hole eta mandatory.",
+    "hi": "Aadhaar card lekar bank branch mein jaiye aur boliye: 'DBT — Direct Benefit Transfer ke liye apna Aadhaar number bank account se link karna chahta/chahti hoon. Aadhaar seeding form dijiye please.' Sarkari labh seedha pane ke liye yeh zaroori hai.",
+    "audio_url": null
+  },
+
+  "ADDRESS_MISMATCH": {
+    "where": "Gram Panchayat Office / Ward Office / Municipal Office",
+    "form": "Address Correction / Update Form",
+    "en": "Go to your local Gram Panchayat or Ward Office and bring both your Ration Card and Voter ID. Say: 'The address on my Ration Card does not match my Voter ID. I need the address corrected. Please help me with the form.' They will guide you on which document to update.",
+    "bn": "Aapnar local Gram Panchayat ba Ward Office-e jaao. Ration Card ebong Voter ID duto niye jaao. Bolo: 'Amar Ration Card-er thikana Voter ID-r thikana-r sathe mile na. Thikana thik korte chai. Form-er jonyo help korben please.' Ke kon document update korben seta tara bolbe.",
+    "hi": "Apne local Gram Panchayat ya Ward Office mein jaiye. Ration Card aur Voter ID dono saath le jaiye. Boliye: 'Mere Ration Card ka pata Voter ID ke pate se match nahi karta. Pata theek karna chahta/chahti hoon. Form ke liye help karein please.' Kaun sa document update karna hai, woh batayenge.",
+    "audio_url": null
+  },
+
+  "DOB_MISMATCH": {
+    "where": "Aadhaar Seva Kendra / Aadhaar Enrolment Centre",
+    "form": "Aadhaar Correction Form (Date of Birth)",
+    "en": "Go to your nearest Aadhaar Seva Kendra and say: 'The date of birth on my Aadhaar card does not match my Birth Certificate. I want to correct it.' Bring your Birth Certificate as proof. There may be a small correction fee.",
+    "bn": "Nearest Aadhaar Seva Kendra-te jaao ebong bolo: 'Amar Aadhaar card-e jonmo tarikh Birth Certificate-er sathe mile na. Eta thik korte chai.' Proof hisebe Birth Certificate niye jaao. Ektu fee lagbe pare.",
+    "hi": "Apne nearest Aadhaar Seva Kendra mein jaiye aur boliye: 'Mere Aadhaar card mein date of birth Birth Certificate se match nahi karti. Ise theek karna chahta/chahti hoon.' Proof ke liye Birth Certificate saath le jaiye. Chhoti si correction fee lag sakti hai.",
+    "audio_url": null
+  },
+
+  "MISSING_BANK_ACCOUNT": {
+    "where": "Any nationalised bank (SBI, UCO, Bandhan Bank preferred in WB)",
+    "form": "Account Opening Form (Jan Dhan / Zero Balance)",
+    "en": "Go to a bank branch and say: 'I want to open a zero balance savings account for government DBT benefits. I have my Aadhaar card and Voter ID.' Under Pradhan Mantri Jan Dhan Yojana, no minimum balance is required.",
+    "bn": "Ekta bank branch-e jaao ebong bolo: 'Sarkar-er DBT benefit-er jonyo zero balance savings account khulte chai. Amar kache Aadhaar card ebong Voter ID ache.' Pradhan Mantri Jan Dhan Yojana-r under-e minimum balance lagbe na.",
+    "hi": "Kisi bank branch mein jaiye aur boliye: 'Sarkari DBT labh ke liye zero balance savings account kholna chahta/chahti hoon. Mere paas Aadhaar card aur Voter ID hai.' Pradhan Mantri Jan Dhan Yojana ke tahat minimum balance nahi chahiye.",
+    "audio_url": null
+  }
+}
