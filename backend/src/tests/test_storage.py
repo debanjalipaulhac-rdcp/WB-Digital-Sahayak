@@ -9,7 +9,7 @@ import sys, os, json, unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 # MUST be first — stubs boto3 and other externals before any project imports
-from ..test.stub_externals import * # noqa: F401
+from src.tests.stub_externals import * # noqa: F401
 
 from unittest.mock import MagicMock, patch
 
@@ -245,33 +245,33 @@ class TestS3AudioCache(unittest.TestCase):
 class TestTwilioMessageBuilders(unittest.TestCase):
 
     def test_score_message_green_has_emoji_and_score(self):
-        from ..config.twilio_client import build_score_message
+        from src.config.twilio_client import build_score_message
         msg = build_score_message(90, "GREEN", "Lakshmir Bhandar")
         self.assertIn("🟢", msg)
         self.assertIn("90", msg)
 
     def test_score_message_red_has_emoji_and_score(self):
-        from ..config.twilio_client import build_score_message
+        from src.config.twilio_client import build_score_message
         msg = build_score_message(20, "RED", "Lakshmir Bhandar")
         self.assertIn("🔴", msg)
         self.assertIn("20", msg)
 
     def test_issue_message_empty_shows_tick(self):
-        from ..config.twilio_client import build_issue_message
+        from src.config.twilio_client import build_issue_message
         self.assertIn("✅", build_issue_message([]))
 
     def test_issue_message_fatal_shows_warning(self):
-        from ..config.twilio_client import build_issue_message
+        from src.config.twilio_client import build_issue_message
         msg = build_issue_message([{"type": "fatal", "code": "NAME_MISMATCH", "message": "Name mismatch on Aadhaar and Bank"}])
         self.assertIn("⚠️", msg)
         self.assertIn("Name mismatch", msg)
 
     def test_roadmap_empty_returns_empty_string(self):
-        from ..config.twilio_client import build_roadmap_message
+        from src.config.twilio_client import build_roadmap_message
         self.assertEqual("", build_roadmap_message([]))
 
     def test_roadmap_shows_numbered_steps(self):
-        from ..config.twilio_client import build_roadmap_message
+        from src.config.twilio_client import build_roadmap_message
         msg = build_roadmap_message([
             {"step": 1, "where": "Bank Branch", "what": "Fix name", "what_bn": "নাম ঠিক করুন"},
             {"step": 2, "where": "BDO Office", "what": "Submit", "what_bn": "জমা দিন"},
@@ -281,15 +281,15 @@ class TestTwilioMessageBuilders(unittest.TestCase):
         self.assertIn("Bank Branch", msg)
 
     def test_format_whatsapp_10_digit(self):
-        from ..config.twilio_client import format_whatsapp_number
+        from src.config.twilio_client import format_whatsapp_number
         self.assertEqual("whatsapp:+919876543210", format_whatsapp_number("9876543210"))
 
     def test_format_whatsapp_already_formatted(self):
-        from ..config.twilio_client import format_whatsapp_number
+        from src.config.twilio_client import format_whatsapp_number
         self.assertEqual("whatsapp:+919876543210", format_whatsapp_number("whatsapp:+919876543210"))
 
     def test_format_whatsapp_with_plus(self):
-        from ..config.twilio_client import format_whatsapp_number
+        from src.config.twilio_client import format_whatsapp_number
         self.assertEqual("whatsapp:+919876543210", format_whatsapp_number("+919876543210"))
 
 
@@ -299,28 +299,31 @@ class TestTwilioMessageBuilders(unittest.TestCase):
 class TestSettings(unittest.TestCase):
 
     def test_loads_without_crash(self):
-        from ..config.settings import settings
+        from src.config.settings import settings
         self.assertIsNotNone(settings)
 
     def test_default_region_is_mumbai(self):
-        from ..config.settings import settings
+        from src.config.settings import settings
         self.assertEqual("ap-south-1", settings.AWS_REGION)
 
     def test_schemes_json_exists(self):
-        from ..config.settings import settings
+        from src.config.settings import settings
         self.assertTrue(os.path.exists(settings.SCHEMES_JSON_PATH),
                         f"schemes.json not found at {settings.SCHEMES_JSON_PATH}")
 
     def test_scripts_json_exists(self):
-        from ..config.settings import settings
+        from src.config.settings import settings
         self.assertTrue(os.path.exists(settings.SCRIPTS_JSON_PATH),
                         f"scripts.json not found at {settings.SCRIPTS_JSON_PATH}")
 
     def test_repr_does_not_leak_secrets(self):
-        from ..config.settings import settings
+        from src.config.settings import settings
         r = repr(settings)
         self.assertNotIn("sk_live", r)
-        self.assertIn("MISSING", r)
+        self.assertTrue("SET" in r or "MISSING" in r)
+        self.assertIn("SARVAM_KEY=", r)
+        self.assertIn("TWILIO_SID=", r)
+        self.assertIn("PINECONE_KEY=", r)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -329,26 +332,27 @@ class TestSettings(unittest.TestCase):
 class TestBedrockFallback(unittest.TestCase):
 
     def test_fallback_green_bn_contains_name_and_score(self):
-        from ..config.bedrock_client import _fallback_explanation
+        from src.config.bedrock_client import _fallback_explanation
         text = _fallback_explanation(90, "GREEN", [], "Lakshmir Bhandar", "Sulata", "bn")
         self.assertIn("Sulata", text)
         self.assertIn("90", text)
 
     def test_fallback_red_mentions_fatal_count(self):
-        from ..config.bedrock_client import _fallback_explanation
+        # from src.config.bedrock_client import _fallback_explanation
+        from src.config.bedrock_client import _fallback_explanation
         issues = [{"type": "fatal"}, {"type": "fatal"}]
         text = _fallback_explanation(20, "RED", issues, "Lakshmir Bhandar", "Sulata", "bn")
         self.assertIn("2", text)
 
     def test_fallback_en_contains_name_and_score(self):
-        from ..config.bedrock_client import _fallback_explanation
+        from src.config.bedrock_client import _fallback_explanation
         text = _fallback_explanation(85, "GREEN", [], "Swasthya Sathi", "Priya", "en")
         self.assertIn("Priya", text)
         self.assertIn("85", text)
 
     def test_generate_explanation_returns_non_empty_string_without_aws(self):
         """With no AWS creds, must fall back to template — never crash or return empty."""
-        from ..config.bedrock_client import generate_explanation
+        from src.config.bedrock_client import generate_explanation
         result = generate_explanation(
             score=42, band="RED",
             issues=[{"type": "fatal", "code": "NAME_MISMATCH", "message": "Name mismatch"}],

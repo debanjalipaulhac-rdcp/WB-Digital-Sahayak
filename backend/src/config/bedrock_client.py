@@ -83,7 +83,7 @@ def generate_explanation(
             accept="application/json",
             body=json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 300,
+                "max_tokens": 1024,
                 "temperature": 0.3,       # Low temp = consistent, not creative
                 "messages": [
                     {"role": "user", "content": prompt}

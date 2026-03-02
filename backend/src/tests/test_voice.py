@@ -7,8 +7,7 @@ Run: python src/tests/test_voice.py
 """
 import sys, os, unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
-
-from .stub_externals import *  # noqa: F401 — must be before all project imports
+from src.tests.stub_externals import * # noqa: F401 — must be before all project imports
 
 from unittest.mock import MagicMock, patch
 

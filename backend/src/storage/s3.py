@@ -40,8 +40,8 @@ from typing import Optional
 
 from botocore.exceptions import ClientError
 
-from config.aws_clients import get_s3_client
-from config.settings import settings
+from src.config.aws_clients import get_s3_client
+from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 

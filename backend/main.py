@@ -11,12 +11,12 @@ Deploy to Lambda:
     Lambda handler in infra/template.yaml points to: main.handler
 """
 
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 from src.config.settings import settings
 from src.channels.api import router as api_router
+from src.channels.whatsapp import router as whatsapp_router
 
 settings.validate() 
 
@@ -42,6 +42,8 @@ app.add_middleware(
 # ── Mount routers ────────────────────────────────────────────────────────────
 app.include_router(api_router, prefix="/api/v1", tags=["Core API"])
 # app.include_router(whatsapp_router, prefix="/webhook", tags=["WhatsApp"])  # Level 4
+app.include_router(whatsapp_router,  prefix="",        tags=["WhatsApp"])
+
 
 # ── Health check ─────────────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])
@@ -57,6 +59,14 @@ def root():
 def health():
     return {"status": "ok"}
 
-# ── AWS Lambda handler (Mangum) ──────────────────────────────────────────────
-# This is what Lambda calls. Do NOT rename 'handler'.
-handler = Mangum(app, lifespan="off")
+# ── Lambda handler (Mangum wraps FastAPI for AWS Lambda) ──────────────────────
+try:
+    from mangum import Mangum
+    lambda_handler = Mangum(app, lifespan="off")
+except ImportError:
+    lambda_handler = None   # local dev — mangum not needed
+
+# ── Local dev entry ────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
