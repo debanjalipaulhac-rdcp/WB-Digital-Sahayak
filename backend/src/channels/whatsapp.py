@@ -1,701 +1,619 @@
 """
 src/channels/whatsapp.py
-=========================
-Twilio WhatsApp webhook handler + conversation state machine.
+========================
+Twilio WhatsApp webhook — the full pipeline in one file.
 
-ARCHITECTURE:
-  Twilio → POST /webhook/whatsapp → this handler
-  Handler reads session from DynamoDB → processes message → sends reply via Twilio → saves session
+FLOW:
+  POST /webhook/whatsapp
+    → return 200 immediately           # Twilio timeout = 15s, we can't block
+    → background thread runs pipeline:
+        guardrails → STT/language detect → session load → intent route
+        → handler → translate → chunk → cache → TTS → assemble → send
 
-CONVERSATION STATES (conversation_step):
-  START              → New user. Send welcome + ask which scheme.
-  AWAITING_SCHEME    → User said "hi". Waiting for scheme choice.
-  AWAITING_PROFILE   → Have scheme. Collecting: age, gender, caste, district.
-  AWAITING_DOCS      → Have profile. Asking which documents they have.
-  AWAITING_NAMES     → Have docs. Collecting names on each doc (for mismatch check).
-  AWAITING_BANK      → Have names. Checking bank status.
-  RESULT_SHOWN       → Sent the result. Waiting for "what next?" follow-ups.
-  AWAITING_SCRIPT    → User asked for office script for a specific issue.
+SESSION (DynamoDB):
+  - Key: phone_number
+  - TTL: 5 minutes of inactivity → new session on next message
+  - Sliding window: last 5 messages stored for context
+  - Stores: language_code, last_active, history[], session_context{}
 
-VOICE HIERARCHY (Strategy 3):
-  Tier 1 (TTS audio): score_reveal, mismatch_alert, welcome, office_script
-  Tier 2 (text only): confirmations, prompts, acknowledgements
-
-COST GUARDS:
-  - 15s audio cap enforced by sarvam_stt.py
-  - Cache-first TTS via sarvam_tts.py + s3.py
-  - Short-circuit: ineligible users terminated immediately (no further STT spend)
+5-MIN SESSION LOGIC:
+  On every message:
+    if (now - last_active) > 300 seconds → reset session, treat as new user
+    else → continue existing session
 """
 
 import json
 import logging
+import threading
+import time
+import requests as http_requests
 from typing import Optional
-from fastapi import APIRouter, Request, Response, HTTPException
-from fastapi.responses import PlainTextResponse
 
-from src.voice.response_router import should_send_audio, format_whatsapp_response
-from src.ai.language_detector import get_response_lang
-from src.storage.dynamo import (
-    get_session, save_session, clear_session,
-    get_profile, save_profile, save_result
-)
-from src.engine.eligibility import run_eligibility_check, get_all_schemes, get_scheme
-from src.ai.vector_search import search as vector_search
-from src.config.bedrock_client import generate_explanation
-from src.config.twilio_client import (
-    get_twilio_client, get_twilio_whatsapp_number, format_whatsapp_number,
-    build_score_message, build_issue_message, build_roadmap_message
-)
+from fastapi import APIRouter, Request
+from fastapi.responses import PlainTextResponse
+from twilio.rest import Client as TwilioClient
+
+# Pipeline imports
+from src.voice.stt                  import transcribe_audio, STTResult
+from src.engine.scoring             import calculate_score, get_readiness_label_bn
+from src.storage.dynamo             import get_user, save_user, update_session_state
+from src.engine.mismatch            import check_name_mismatch,generate_mismatch_script
+from src.cache.audio_cache          import resolve_chunks, fill_misses
+from src.router.guardrails          import validate_input
+from src.engine.eligibility         import check_eligibility, get_all_eligible_schemes
+from src.cache.tts_generator        import generate_for_misses
+from src.voice.chunk_splitter       import split_into_chunks
+from src.router.intent_router       import route, IntentType
+from src.static.scheme_lookup       import lookup as static_lookup
+from src.translate.translator       import translate_text
+from src.voice.language_detect      import detect_language, is_greeting
+from src.voice.audio_assembler      import assemble_audio
+from src.dynamic.vector_search      import search as vector_search
+from src.cache.background_saver     import save_new_chunks_async
+from src.dynamic.nova_responder     import generate_response, OUT_OF_SCOPE_RESPONSE
+from src.static.greeting_handler    import get_greeting_response
+from src.dynamic.keyword_extractor  import extract_keywords
+
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# ─────────────────────────────────────────────────────────────
+# CONSTANTS
+# ─────────────────────────────────────────────────────────────
+SESSION_TTL_SECONDS  = 300        # 5 minutes inactivity → new session
+HISTORY_WINDOW_SIZE  = 5          # Sliding window: last N exchanges
+MAX_AUDIO_SECONDS    = 45         # Safety buffer under 50s SLA
 
-# ── Twilio Webhook Entry Point ─────────────────────────────────────────────────
+ERROR_MSG_BN = "দুঃখিত, কিছু সমস্যা হয়েছে। একটু পরে আবার চেষ্টা করুন।"
+ERROR_MSG_EN = "Sorry, something went wrong. Please try again."
 
+
+# ─────────────────────────────────────────────────────────────
+# TWILIO CLIENT
+# ─────────────────────────────────────────────────────────────
+
+from src.config.twilio_client import get_twilio_client
+
+
+def _wa_number(phone: str) -> str:
+    """Ensure number is in whatsapp:+91XXXXXXXXXX format."""
+    if not phone.startswith("whatsapp:"):
+        return f"whatsapp:{phone}"
+    return phone
+
+
+# ─────────────────────────────────────────────────────────────
+# WEBHOOK ENTRY POINT — returns 200 immediately
+# ─────────────────────────────────────────────────────────────
 @router.post("/webhook/whatsapp")
 async def whatsapp_webhook(request: Request):
     """
-    Receives all incoming WhatsApp messages and voice notes from Twilio.
+    Receive Twilio webhook. Return 200 immediately.
+    Actual processing runs in a background thread.
 
-    Twilio sends a form POST with these fields:
-      From:        "whatsapp:+919876543210"
-      Body:        "আমি Lakshmir Bhandar জানতে চাই"
-      NumMedia:    "1"  (if voice note attached)
-      MediaUrl0:   "https://api.twilio.com/..."  (voice note URL)
-      MediaContentType0: "audio/ogg"
-
-    We always respond with 200 OK + empty body.
-    The actual reply is sent asynchronously via Twilio REST API.
+    Twilio form fields:
+      From:                  "whatsapp:+919876543210"
+      Body:                  "লক্ষ্মীর ভাণ্ডার কি আমার জন্য?"
+      NumMedia:              "1" if voice/media attached
+      MediaUrl0:             voice note URL
+      MediaContentType0:     "audio/ogg"
     """
     try:
-        form = await request.form()
-        phone     = str(form.get("From", "")).strip()
-        body      = str(form.get("Body", "")).strip()
-        num_media = int(form.get("NumMedia", 0))
-        media_url = str(form.get("MediaUrl0", "")).strip() if num_media > 0 else ""
+        form       = await request.form()
+        phone      = str(form.get("From", "")).strip()
+        body       = str(form.get("Body", "")).strip()
+        num_media  = int(form.get("NumMedia", 0))
+        media_url  = str(form.get("MediaUrl0", "")).strip() if num_media > 0 else ""
         media_type = str(form.get("MediaContentType0", "")).strip()
-
+        print(form)
         if not phone:
-            logger.error("Webhook called with no From field")
+            logger.error("Webhook received with no From field")
             return PlainTextResponse("", status_code=200)
 
-        logger.info(f"Incoming: {phone} | text='{body[:40]}' | media={num_media > 0}")
+        logger.info(f"[webhook] from={phone} | text='{body[:40]}' | audio={bool(media_url)}")
 
-        # Process in a try/except — never let a bug kill the 200 response to Twilio
+        # Fire background thread — never block Twilio
+        thread = threading.Thread(
+            target=_safe_pipeline,
+            args=(phone, body, media_url, media_type),
+            daemon=True
+        )
+        thread.start()
+
+    except Exception as e:
+        logger.error(f"[webhook] outer exception: {e}", exc_info=True)
+
+    # Always return 200 to Twilio regardless of what happens
+    return PlainTextResponse("", status_code=200)
+
+
+# ─────────────────────────────────────────────────────────────
+# SAFE WRAPPER — catches everything so thread never crashes silently
+# ─────────────────────────────────────────────────────────────
+def _safe_pipeline(phone: str, body: str, media_url: str, media_type: str):
+    """Wraps full pipeline in try/except. Sends error message on failure."""
+    try:
+        _pipeline(phone, body, media_url, media_type)
+    except Exception as e:
+        logger.error(f"[pipeline] CRASH for {phone}: {e}", exc_info=True)
         try:
-            await _handle_message(phone, body, media_url, media_type)
-        except Exception as e:
-            logger.error(f"Message handler crashed for {phone}: {e}")
-            _send_text(phone, "দুঃখিত, একটু সমস্যা হয়েছে। একটু পরে আবার চেষ্টা করুন।")
-
-        return PlainTextResponse("", status_code=200)
-
-    except Exception as e:
-        logger.error(f"Webhook outer exception: {e}")
-        return PlainTextResponse("", status_code=200)   # always 200 to Twilio
+            # Try to get user language for error message
+            user = get_user(phone) or {}
+            lang = user.get("language_code", "bn-IN")
+            error_msg = ERROR_MSG_BN if lang == "bn-IN" else ERROR_MSG_EN
+            _send_text(phone, error_msg)
+        except Exception:
+            pass   # If even error send fails, swallow silently
 
 
-# ── Message Dispatcher ────────────────────────────────────────────────────────
-
-async def _handle_message(phone: str, body: str, media_url: str, media_type: str):
+# ─────────────────────────────────────────────────────────────
+# FULL PIPELINE
+# ─────────────────────────────────────────────────────────────
+def _pipeline(phone: str, body: str, media_url: str, media_type: str):
     """
-    Route the incoming message to the correct state handler.
+    Complete message processing pipeline.
+    Steps are numbered for easy debugging in CloudWatch logs.
     """
-    # Step 1: Transcribe if voice note
-    user_text = body
-    is_voice  = False
 
-    if media_url and "audio" in media_type:
-        user_text, is_voice = _transcribe_voice(phone, media_url)
-        if user_text is None:
-            return   # transcription failed or was rejected — message already sent
+    # ── STEP 1: Load session ──────────────────────────────────
+    user     = get_user(phone) or {}
+    session  = _load_or_reset_session(phone, user)
+    language = session.get("language_code", "bn-IN")
+    is_voice = bool(media_url and "audio" in media_type)
 
-    # Step 2: Clean and normalise
-    user_text = user_text.strip()
+    logger.info(f"[1] session={session.get('state')} lang={language} voice={is_voice}")
 
-    # Step 3: Global commands — work from any state
-    if _is_restart_command(user_text):
-        clear_session(phone)
-        _handle_start(phone)
-        return
-
-    # Step 4: Load session — store voice flag + detected language
-    session = get_session(phone) or {}
-    step    = session.get("conversation_step", "START")
-
-    # Persist voice flag so response_router can use it this turn
-    session["last_input_was_voice"] = is_voice
-    # Detect + store language (persists across turns)
-    if not session.get("lang"):
-        session["lang"] = get_response_lang(user_text, session)
-
-    logger.info(f"State: {phone} | step={step} | text='{user_text[:40]}'")
-
-    # Step 5: Route to handler
-    handlers = {
-        "START":            _handle_start,
-        "AWAITING_SCHEME":  _handle_scheme_selection,
-        "AWAITING_PROFILE": _handle_profile_collection,
-        "AWAITING_DOCS":    _handle_doc_collection,
-        "AWAITING_NAMES":   _handle_name_collection,
-        "AWAITING_BANK":    _handle_bank_questions,
-        "RESULT_SHOWN":     _handle_post_result,
-        "AWAITING_SCRIPT":  _handle_script_request,
-    }
-
-    handler = handlers.get(step, _handle_start)
-    handler(phone, user_text, session)
-
-
-# ── State Handlers ────────────────────────────────────────────────────────────
-
-def _handle_start(phone: str, text: str = "", session: dict = {}):
-    """
-    First contact or restart. Send welcome and ask for scheme.
-    """
-    from src.voice.sarvam_tts import generate_welcome_audio
-
-    # Try to send cached welcome audio (Tier 1)
-    url, _ = generate_welcome_audio()
-    if url:
-        _send_voice(phone, url)
+    # ── STEP 2: Get text (STT or raw) ────────────────────────
+    if is_voice:
+        text, language = _handle_audio_input(phone, media_url, media_type, language)
+        if text is None:
+            # STT failed — ask user to resend
+            _send_text(phone, _t(
+                language,
+                bn="আপনার অডিও শুনতে পাইনি। একটু জোরে বলুন বা টেক্সটে লিখুন।",
+                en="Could not hear your audio. Please speak louder or type your message."
+            ))
+            return
     else:
-        # Tier 2 fallback
-        _send_text(phone,
-            "🙏 স্বাগতম! আমি আপনার Digital Sahayak।\n\n"
-            "আপনি কোন scheme জানতে চান?\n\n"
-            "1️⃣ Lakshmir Bhandar (মহিলা - ₹1000/মাস)\n"
-            "2️⃣ Swasthya Sathi (স্বাস্থ্য বীমা ₹5 লাখ)\n"
-            "3️⃣ Kanyashree (মেয়েদের পড়াশোনা)\n"
-            "4️⃣ Yuva Sathi (যুবক - ₹1500/মাস)\n\n"
-            "নম্বর লিখুন অথবা বলুন কী দরকার।"
-        )
+        text = body.strip()
+        if not text:
+            logger.info(f"[2] empty text body, ignoring")
+            return
+        # Detect language from text
+        detected = detect_language(text)
+        if detected != "en-IN":   # trust detection for non-English
+            language = detected
 
-    save_session(phone, {"conversation_step": "AWAITING_SCHEME"})
+    logger.info(f"[2] text='{text[:60]}' detected_lang={language}")
 
+    # ── STEP 3: Update session language if changed ───────────
+    if language != session.get("language_code"):
+        session["language_code"] = language
+        user["language_code"]    = language
 
-def _handle_scheme_selection(phone: str, text: str, session: dict):
-    """
-    User is choosing a scheme. Try number → keyword → vector search.
-    """
-    # Direct number mapping
-    number_map = {
-        "1": "lakshmir_bhandar", "১": "lakshmir_bhandar",
-        "2": "swasthya_sathi",   "২": "swasthya_sathi",
-        "3": "kanyashree",       "৩": "kanyashree",
-        "4": "yuva_sathi",       "৪": "yuva_sathi",
-    }
-
-    scheme_id = number_map.get(text.strip())
-
-    # Keyword shortcuts
-    if not scheme_id:
-        t = text.lower()
-        if any(k in t for k in ["lakshmir", "লক্ষ্মী", "bhandar", "ভান্ডার", "1000"]):
-            scheme_id = "lakshmir_bhandar"
-        elif any(k in t for k in ["swasthya", "স্বাস্থ্য", "health", "hospital", "sathi"]):
-            scheme_id = "swasthya_sathi"
-        elif any(k in t for k in ["kanyashree", "কন্যাশ্রী", "daughter", "মেয়ে", "girl"]):
-            scheme_id = "kanyashree"
-        elif any(k in t for k in ["yuva", "যুবা", "job", "চাকরি", "unemployed", "বেকার"]):
-            scheme_id = "yuva_sathi"
-
-    # Vector search fallback
-    if not scheme_id:
-        results = vector_search(text, top_k=1)
-        if results and results[0]["similarity"] > 0.55:
-            scheme_id = results[0]["scheme_id"]
-            _send_text(phone,
-                f"✅ আমি বুঝতে পেরেছি — {results[0]['scheme_name_bn'] or results[0]['scheme_name']} "
-                f"সম্পর্কে জানতে চান। শুরু করি?"
-            )
-
-    if not scheme_id:
-        _send_text(phone,
-            "দুঃখিত, বুঝতে পারলাম না। 1, 2, 3 বা 4 লিখুন:\n\n"
-            "1️⃣ Lakshmir Bhandar\n2️⃣ Swasthya Sathi\n3️⃣ Kanyashree\n4️⃣ Yuva Sathi"
-        )
+    # ── STEP 4: Guardrails ───────────────────────────────────
+    guard = validate_input(text)
+    if not guard.valid:
+        logger.info(f"[4] guardrail blocked: {guard.reason}")
+        _respond(phone, guard.response or ERROR_MSG_EN, language, is_voice)
         return
 
-    scheme = get_scheme(scheme_id)
-    el = scheme.get("eligibility", {})
+    # ── STEP 5: Reset command check ──────────────────────────
+    if _is_reset_command(text):
+        _reset_session(phone, language)
+        _respond(phone, _t(
+            language,
+            bn="নতুন কথোপকথন শুরু হলো। কীভাবে সাহায্য করতে পারি?",
+            en="Starting a new conversation. How can I help you?"
+        ), language, is_voice)
+        return
 
-    # Ask age first
-    _send_text(phone,
-        f"✅ {scheme['scheme_name_bn'] or scheme['scheme_name']} বেছে নিয়েছেন।\n\n"
-        f"আপনার বয়স কত? (সংখ্যায় লিখুন)"
-    )
+    # ── STEP 6: Intent routing ───────────────────────────────
+    decision = route(text, language)
+    logger.info(f"[6] intent={decision.intent} scheme={decision.scheme_id} "
+                f"qa_type={decision.qa_type} conf={decision.confidence:.2f}")
 
-    save_session(phone, {
-        "conversation_step": "AWAITING_PROFILE",
-        "scheme_id": scheme_id,
-        "profile_stage": "age",
-        "partial_profile": {},
-        "partial_checks": {}
-    })
+    # ── STEP 7: Handle by intent ─────────────────────────────
+    response_text = None
+    audio_url_direct = None   # If we already have a pre-cached URL (greeting/static)
 
+    if decision.intent == IntentType.GREETING:
+        # GREETING PATH — zero API calls
+        greeting = get_greeting_response(language)
+        _send_text(phone, greeting.text)
+        if is_voice and greeting.audio_key:
+            from src.storage.s3 import get_audio_url
+            _send_audio(phone, get_audio_url(greeting.audio_key))
+        _save_session(phone, session, text, greeting.text)
+        return
 
-def _handle_profile_collection(phone: str, text: str, session: dict):
-    """
-    Collect profile fields one at a time: age → gender → caste → district.
-    Uses a stage machine within AWAITING_PROFILE state.
-    """
-    scheme_id       = session.get("scheme_id", "lakshmir_bhandar")
-    stage           = session.get("profile_stage", "age")
-    partial_profile = session.get("partial_profile", {})
-    partial_checks  = session.get("partial_checks", {})
-    scheme          = get_scheme(scheme_id)
-    el              = scheme.get("eligibility", {}) if scheme else {}
+    elif decision.intent == IntentType.STATIC_QA:
+        # STATIC Q&A — DynamoDB lookup, no AI
+        # Translate to English for lookup if needed
+        lookup_q = translate_text(text, language, "en-IN") if language != "en-IN" else text
+        static   = static_lookup(lookup_q, language)
 
-    # ── Parse current field ────────────────────────────────────────────────────
-    if stage == "age":
-        age = _extract_number(text)
-        if not age or age < 1 or age > 120:
-            _send_text(phone, "বয়স সঠিকভাবে লিখুন। যেমন: 38")
-            return
-
-        # ── STRATEGY 2 SHORT-CIRCUIT: Early ineligibility check ───────────────
-        age_min = el.get("age_min", 0)
-        age_max = el.get("age_max", 999)
-        if age < age_min or age > age_max:
-            _send_text(phone,
-                f"⛔ দুঃখিত। {scheme['scheme_name']} এর জন্য বয়স {age_min}-{age_max} হতে হবে।\n"
-                f"আপনার বয়স {age} — আপনি eligible নন।\n\n"
-                "অন্য scheme দেখতে '1' লিখুন।"
-            )
-            save_session(phone, {"conversation_step": "AWAITING_SCHEME"})
-            return
-
-        partial_profile["age"] = age
-
-        # Check if scheme needs gender
-        if el.get("gender"):
-            _send_text(phone, "আপনি কি পুরুষ নাকি মহিলা? (পুরুষ/মহিলা)")
-            save_session(phone, {**session, "profile_stage": "gender",
-                                 "partial_profile": partial_profile})
+        if static:
+            logger.info(f"[7] static HIT: {static.qa_id}")
+            response_text = static.answer_text
+            if static.audio_url:
+                audio_url_direct = static.audio_url
         else:
-            # Skip gender — go to caste
-            _ask_caste(phone, session, partial_profile)
+            # Static miss → fall through to dynamic
+            logger.info(f"[7] static MISS → escalating to dynamic")
+            response_text = _dynamic_path(text, language, decision)
 
-    elif stage == "gender":
-        gender = _parse_gender(text)
-        if not gender:
-            _send_text(phone, "পুরুষ অথবা মহিলা লিখুন।")
-            return
-
-        partial_profile["gender"] = gender
-
-        # ── SHORT-CIRCUIT: Gender mismatch ────────────────────────────────────
-        required_gender = el.get("gender")
-        if required_gender and gender != required_gender:
-            _send_text(phone,
-                f"⛔ {scheme['scheme_name']} শুধুমাত্র {required_gender} দের জন্য।\n"
-                "অন্য scheme দেখতে '1' লিখুন।"
-            )
-            save_session(phone, {"conversation_step": "AWAITING_SCHEME"})
-            return
-
-        _ask_caste(phone, session, partial_profile)
-
-    elif stage == "caste":
-        caste = _parse_caste(text)
-        partial_profile["caste"] = caste
-        _send_text(phone, "আপনার জেলার নাম? (যেমন: Jalpaiguri, Kolkata, Murshidabad)")
-        save_session(phone, {**session, "profile_stage": "district",
-                             "partial_profile": partial_profile})
-
-    elif stage == "district":
-        partial_profile["district"] = text.strip().title()
-
-        # Check employment
-        if el.get("must_be_unemployed") or scheme_id == "yuva_sathi":
-            _send_text(phone, "আপনি কি সরকারি চাকরি করেন? (হ্যাঁ/না)")
-            save_session(phone, {**session, "profile_stage": "employment",
-                                 "partial_profile": partial_profile})
-        else:
-            _start_doc_collection(phone, scheme_id, partial_profile, partial_checks)
-
-    elif stage == "employment":
-        is_govt = _parse_yes_no(text)
-        partial_profile["is_govt_employee"] = is_govt
-        partial_profile["pays_income_tax"]  = is_govt
-
-        if is_govt:
-            _send_text(phone,
-                f"⛔ সরকারি কর্মচারীরা {scheme['scheme_name']} এর জন্য eligible নন।\n"
-                "অন্য scheme দেখতে '1' লিখুন।"
-            )
-            save_session(phone, {"conversation_step": "AWAITING_SCHEME"})
-            return
-
-        _start_doc_collection(phone, scheme_id, partial_profile, partial_checks)
-
-
-def _ask_caste(phone: str, session: dict, partial_profile: dict):
-    _send_text(phone,
-        "আপনার বর্গ কী?\n\n"
-        "1️⃣ General\n2️⃣ SC (Scheduled Caste)\n3️⃣ ST (Scheduled Tribe)\n4️⃣ OBC"
-    )
-    save_session(phone, {**session, "profile_stage": "caste",
-                         "partial_profile": partial_profile})
-
-
-def _start_doc_collection(phone: str, scheme_id: str, partial_profile: dict, partial_checks: dict):
-    """Move to document collection phase."""
-    scheme = get_scheme(scheme_id)
-    required_docs = [d for d in scheme.get("documents", []) if d.get("required")]
-    doc_labels = [d["label"] for d in required_docs]
-
-    _send_text(phone,
-        f"✅ Profile সংগ্রহ হয়ে গেছে!\n\n"
-        f"এখন documents চেক করব।\n\n"
-        f"আপনার কাছে এগুলো আছে?\n"
-        + "\n".join(f"✅ {label}" for label in doc_labels)
-        + "\n\nসব আছে? (হ্যাঁ/না)"
-    )
-    save_session(phone, {
-        "conversation_step": "AWAITING_DOCS",
-        "scheme_id": scheme_id,
-        "partial_profile": partial_profile,
-        "partial_checks": partial_checks,
-        "required_docs": [d["id"] for d in required_docs],
-        "docs_present": [],
-        "docs_missing": [],
-        "doc_check_stage": "all_docs_check"
-    })
-
-
-def _handle_doc_collection(phone: str, text: str, session: dict):
-    """Check which documents the user has."""
-    scheme_id    = session.get("scheme_id")
-    scheme       = get_scheme(scheme_id)
-    required_docs = session.get("required_docs", [])
-    docs_present  = session.get("docs_present", [])
-    docs_missing  = session.get("docs_missing", [])
-
-    has_all = _parse_yes_no(text)
-
-    if has_all:
-        docs_present = required_docs[:]
-        docs_missing = []
-    else:
-        # For simplicity in MVP: ask about each doc individually
-        # In a full implementation, this would be a multi-turn loop
-        docs_present = [d for d in required_docs if "aadhaar" in d or "voter" in d]
-        docs_missing = [d for d in required_docs if d not in docs_present]
-
-    # Move to name collection for mismatch checks
-    _send_text(phone,
-        "ঠিক আছে। এখন আপনার নাম check করব।\n\n"
-        "Aadhaar card-এ আপনার নাম কী? (বাংলা বা English)"
-    )
-    save_session(phone, {
-        **session,
-        "conversation_step": "AWAITING_NAMES",
-        "name_stage": "aadhaar_name",
-        "docs_present": docs_present,
-        "docs_missing": docs_missing,
-    })
-
-
-def _handle_name_collection(phone: str, text: str, session: dict):
-    """Collect names from each document for mismatch detection."""
-    scheme_id     = session.get("scheme_id")
-    name_stage    = session.get("name_stage", "aadhaar_name")
-    partial_checks = session.get("partial_checks", {})
-
-    if name_stage == "aadhaar_name":
-        partial_checks["aadhaar_name"] = text.strip()
-        _send_text(phone, "Bank passbook বা ATM card-এ নাম কী?")
-        save_session(phone, {**session, "name_stage": "bank_name",
-                             "partial_checks": partial_checks})
-
-    elif name_stage == "bank_name":
-        partial_checks["bank_name"] = text.strip()
-        _send_text(phone,
-            "Bank account কতদিন ধরে কোনো transaction হয়নি?\n\n"
-            "1️⃣ ৬ মাসের কম\n"
-            "2️⃣ ৬-১২ মাস\n"
-            "3️⃣ ১ বছরের বেশি\n"
-            "4️⃣ জানি না"
-        )
-        save_session(phone, {
-            **session,
-            "conversation_step": "AWAITING_BANK",
-            "partial_checks": partial_checks
-        })
-
-
-def _handle_bank_questions(phone: str, text: str, session: dict):
-    """Collect bank account status and run the full eligibility check."""
-    scheme_id      = session.get("scheme_id")
-    partial_profile = session.get("partial_profile", {})
-    partial_checks  = session.get("partial_checks", {})
-    docs_present   = session.get("docs_present", [])
-    docs_missing   = session.get("docs_missing", [])
-
-    # Parse bank inactivity
-    months_map = {"1": 0, "১": 0, "2": 8, "২": 8, "3": 14, "৩": 14, "4": 0, "৪": 0}
-    months_inactive = months_map.get(text.strip(), 0)
-
-    partial_checks["bank_last_transaction_months_ago"] = months_inactive
-    partial_checks["aadhaar_bank_linked"] = months_inactive < 6
-    partial_checks["docs_present"] = docs_present
-    partial_checks["docs_missing"]  = docs_missing
-    partial_checks["address_match_ok"] = True    # assume OK in MVP
-
-    _send_text(phone, "⏳ Check করছি... একটু অপেক্ষা করুন।")
-
-    # ── Run eligibility engine ─────────────────────────────────────────────────
-    result = run_eligibility_check(scheme_id, partial_profile, partial_checks)
-
-    if "error" in result:
-        _send_text(phone, f"❌ Error: {result['error']}")
-        return
-
-    # ── Generate AI explanation ────────────────────────────────────────────────
-    profile_name = partial_profile.get("name", "").split()[0] if partial_profile.get("name") else ""
-    lang         = session.get("lang", "bn")
-    explanation  = generate_explanation(
-        score        = result["score"],
-        band         = result["band"],
-        issues       = result.get("issues", []),
-        scheme_name  = result.get("scheme_name", scheme_id),
-        profile_name = profile_name,
-        lang         = lang
-    )
-
-    # ── Save result ────────────────────────────────────────────────────────────
-    save_result(phone, scheme_id, result)
-
-    # ── Determine audio routing for this user ──────────────────────────────────
-    # partial_profile is the best profile we have at this point
-    use_audio = should_send_audio(partial_profile, session)
-
-    # ── Send score ─────────────────────────────────────────────────────────────
-    from src.voice.sarvam_tts import generate_score_audio
-    score_url, _ = generate_score_audio(result["score"], result["band"],
-                                        result.get("scheme_name", scheme_id))
-    if use_audio and score_url:
-        _send_voice(phone, score_url)
-
-    # Always send text score too (audio not guaranteed on slow connections)
-    score_msg = build_score_message(result["score"], result["band"],
-                                    result.get("scheme_name", scheme_id))
-    _send_text(phone, score_msg)
-
-    # ── Send AI explanation ────────────────────────────────────────────────────
-    if explanation:
-        _send_text(phone, explanation)
-
-    # ── Send issues ────────────────────────────────────────────────────────────
-    issues = result.get("issues", [])
-    if issues:
-        issue_msg = build_issue_message(issues[:3])
-        _send_text(phone, issue_msg)
-
-        # Audio for top fatal issue — only if user qualifies for audio
-        from src.voice.sarvam_tts import generate_issue_audio
-        fatal_issues = [i for i in issues if i.get("type") == "fatal"]
-        if use_audio and fatal_issues:
-            top_code = fatal_issues[0].get("code", "")
-            url, _ = generate_issue_audio(top_code)
-            if url:
-                _send_voice(phone, url)
-
-    # ── Send roadmap ───────────────────────────────────────────────────────────
-    roadmap = result.get("roadmap", [])
-    if roadmap:
-        roadmap_msg = build_roadmap_message(roadmap[:3])
-        _send_text(phone, roadmap_msg)
-
-    # ── Send recommendations ───────────────────────────────────────────────────
-    recs = result.get("recommendations", [])
-    if recs:
-        rec_text = "💡 *অন্য schemes যা আপনার জন্য হতে পারে:*\n"
-        for r in recs[:2]:
-            rec_text += f"• {r['scheme_name_bn'] or r['scheme_name']}: {r['benefit_display']}\n"
-        _send_text(phone, rec_text)
-
-    # ── Post-result menu ───────────────────────────────────────────────────────
-    _send_text(phone,
-        "\n*আরও জানতে চান?*\n"
-        "📜 'script' লিখুন — office-এ কী বলবেন\n"
-        "🔄 'restart' লিখুন — নতুন scheme check করতে"
-    )
-
-    save_session(phone, {
-        "conversation_step": "RESULT_SHOWN",
-        "scheme_id": scheme_id,
-        "last_result": {
-            "score": result["score"],
-            "band":  result["band"],
-            "issues": [i.get("code") for i in issues[:3] if i.get("code")]
-        },
-        "partial_checks": partial_checks,
-    })
-
-
-def _handle_post_result(phone: str, text: str, session: dict):
-    """Handle follow-up questions after result is shown."""
-    t = text.lower().strip()
-
-    if "script" in t or "office" in t or "বলব" in t or "বল" in t:
-        issues = session.get("last_result", {}).get("issues", [])
-        if issues:
-            save_session(phone, {**session, "conversation_step": "AWAITING_SCRIPT",
-                                  "pending_issue": issues[0]})
-            _send_text(phone, f"কোন সমস্যার জন্য script চান?\n" +
-                       "\n".join(f"{i+1}. {code}" for i, code in enumerate(issues)))
-        else:
-            _send_text(phone, "আপনার কোনো বড় সমস্যা নেই। সরাসরি office যান! ✅")
-
-    elif "scheme" in t or "আরও" in t or "other" in t:
-        clear_session(phone)
-        _handle_start(phone)
+    elif decision.intent == IntentType.ELIGIBILITY:
+        # ELIGIBILITY PATH — deterministic engine
+        response_text = _eligibility_path(phone, text, language, decision, session, is_voice)
 
     else:
-        _send_text(phone,
-            "📜 'script' — office-এ কী বলবেন\n"
-            "🔄 'restart' — নতুন scheme check"
+        # DYNAMIC PATH — vector search + Nova Lite
+        response_text = _dynamic_path(text, language, decision)
+
+    if not response_text:
+        response_text = _t(
+            language,
+            bn="দুঃখিত, এই মুহূর্তে উত্তর দিতে পারছি না।",
+            en="Sorry, I could not find an answer right now."
         )
 
+    # ── STEP 8: Deliver response ─────────────────────────────
+    if audio_url_direct:
+        # Pre-cached audio available — send both text and audio directly
+        _send_text(phone, response_text)
+        if is_voice:
+            _send_audio(phone, audio_url_direct)
+    else:
+        _respond(phone, response_text, language, is_voice)
 
-def _handle_script_request(phone: str, text: str, session: dict):
-    """Return the exact office script for an issue."""
-    from src.engine.eligibility import get_script
+    # ── STEP 9: Save session ─────────────────────────────────
+    _save_session(phone, session, text, response_text)
+    _save_user(phone, user, language)
 
-    issue_code = session.get("pending_issue", "NAME_MISMATCH")
-    checks     = session.get("partial_checks", {})
 
-    script = get_script(
-        issue_code,
-        lang="bn",
-        aadhaar_name=checks.get("aadhaar_name", ""),
-        bank_name=checks.get("bank_name", "")
+# ─────────────────────────────────────────────────────────────
+# PATH HANDLERS
+# ─────────────────────────────────────────────────────────────
+
+def _dynamic_path(text: str, language: str, decision) -> str:
+    """
+    Vector search + Nova Lite path.
+    Returns English response text (translated by caller if needed).
+    """
+    # Translate to English for keyword extraction if not already
+    en_text = translate_text(text, language, "en-IN") if language != "en-IN" else text
+
+    keywords      = extract_keywords(en_text)
+    search_result = vector_search(keywords)
+    en_response   = generate_response(en_text, search_result)
+
+    # Translate back to user language
+    if language != "en-IN":
+        return translate_text(en_response, "en-IN", language)
+    return en_response
+
+
+def _eligibility_path(
+    phone: str, text: str, language: str,
+    decision, session: dict, is_voice: bool
+) -> str:
+    """
+    Eligibility check path. Tries to extract profile from text or
+    asks user for missing fields. Returns formatted response.
+    """
+    ctx = session.get("session_context", {})
+
+    # Try to extract profile fields from text
+    profile = _extract_profile_from_text(text, ctx)
+
+    if not profile.get("age") or not profile.get("gender"):
+        # Missing required fields — ask for them
+        session["session_context"] = ctx
+        return _t(
+            language,
+            bn="আপনার বয়স এবং লিঙ্গ জানান। যেমন: '৩৫ বছর মহিলা'",
+            en="Please tell me your age and gender. Example: '35 year old female'"
+        )
+
+    # Run eligibility check
+    scheme_id = decision.scheme_id or "lakshmir_bhandar"
+    result    = check_eligibility(scheme_id, profile)
+    score_res = calculate_score(
+        {"passed_rules": result.passed_rules, "failed_rules": result.failed_rules,
+         "required_documents": result.required_documents},
+        {},   # documents not collected in voice flow yet
+        mismatch_status="match"
     )
 
-    if script and script.get("script"):
-        _send_text(phone, f"📋 *Office-এ এটি বলুন:*\n\n_{script['script']}_")
-        if script.get("where"):
-            _send_text(phone, f"📍 *কোথায় যাবেন:* {script['where']}")
-        if script.get("form"):
-            _send_text(phone, f"📝 *কোন form লাগবে:* {script['form']}")
+    # Format response
+    if result.eligible:
+        response = _t(
+            language,
+            bn=f"✅ আপনি {result.scheme_name} এর জন্য যোগ্য। "
+               f"প্রস্তুতি স্কোর: {score_res.total}/100। "
+               f"দরকারি কাগজ: {', '.join(result.required_documents[:3])}।",
+            en=f"✅ You are eligible for {result.scheme_name}. "
+               f"Readiness score: {score_res.total}/100. "
+               f"Required documents: {', '.join(result.required_documents[:3])}."
+        )
     else:
-        _send_text(phone, "এই সমস্যার জন্য script পাওয়া গেল না। BDO office-এ যোগাযোগ করুন।")
+        failed = "; ".join(result.failed_rules[:2])
+        response = _t(
+            language,
+            bn=f"❌ আপনি এখন {result.scheme_name} এর জন্য যোগ্য নন। "
+               f"কারণ: {failed}।",
+            en=f"❌ You are not currently eligible for {result.scheme_name}. "
+               f"Reason: {failed}."
+        )
 
-    save_session(phone, {**session, "conversation_step": "RESULT_SHOWN"})
+    return response
 
 
-# ── Voice Helpers ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
+# AUDIO RESPONSE ASSEMBLER
+# ─────────────────────────────────────────────────────────────
 
-def _transcribe_voice(phone: str, media_url: str):
+def _respond(phone: str, text: str, language: str, is_voice: bool):
     """
-    Download and transcribe a WhatsApp voice note.
-    Returns (transcript, is_voice) or (None, False) on failure.
+    Full response delivery:
+    1. Always send text
+    2. If voice user → chunk → cache → TTS → assemble → send audio
     """
-    from src.voice.sarvam_stt import transcribe_from_url
+    # Always send text first (instant, no wait)
+    _send_text(phone, text)
 
-    _send_text(phone, "🎤 আপনার voice note শুনছি...")  # Tier 2
-
-    result = transcribe_from_url(media_url, language="bn-IN")
-
-    if result.get("rejected"):
-        _send_text(phone, f"❌ {result['rejection_reason']}")
-        return None, False
-
-    if not result.get("success"):
-        _send_text(phone, "দুঃখিত, voice note বুঝতে পারলাম না। Text-এ লিখুন।")
-        return None, False
-
-    transcript = result.get("transcript", "")
-    logger.info(f"STT: '{transcript[:60]}'")
-    return transcript, True
-
-
-# ── Twilio Send Helpers ───────────────────────────────────────────────────────
-
-def _send_text(phone: str, message: str):
-    """Send a text message via Twilio WhatsApp. Tier 2 — always text."""
-    if settings.MOCK_MODE:
-        logger.info(f"MOCK SEND TEXT → {phone}: {message[:60]}")
+    if not is_voice:
         return
 
+    # Audio path
+    chunks      = split_into_chunks(text)
+    if not chunks:
+        logger.warning(f"[respond] No chunks from text: '{text[:40]}'")
+        return
+
+    # Guard: estimate duration
+    from src.voice.chunk_splitter import estimate_audio_duration
+    est_seconds = estimate_audio_duration(chunks)
+    if est_seconds > MAX_AUDIO_SECONDS:
+        logger.warning(f"[respond] Response too long for audio ({est_seconds:.1f}s), skipping")
+        return
+
+    # Cache lookup
+    resolution  = resolve_chunks(chunks, language)
+
+    # TTS for misses only
+    generated   = {}
+    if resolution.misses:
+        generated = generate_for_misses(resolution.misses, language)
+
+    # Fill URLs in order
+    all_urls    = fill_misses(resolution, generated)
+    if not all_urls:
+        logger.error("[respond] No audio URLs available after cache+TTS")
+        return
+
+    # Assemble and send
+    final_url   = assemble_audio(all_urls)
+    if final_url:
+        _send_audio(phone, final_url)
+    else:
+        logger.error("[respond] assemble_audio returned None")
+
+    # Background: save new chunks to DynamoDB cache
+    if generated:
+        new_chunks = [
+            {"chunk_text": chunk, "audio_url": url}
+            for chunk, url in generated.items()
+        ]
+        save_new_chunks_async(new_chunks, language)
+
+
+# ─────────────────────────────────────────────────────────────
+# TWILIO SEND HELPERS
+# ─────────────────────────────────────────────────────────────
+
+def _send_text(phone: str, text: str):
+    """Send text message via Twilio."""
     try:
         client = get_twilio_client()
-        if not client:
-            logger.error("Twilio client unavailable")
-            return
-
         client.messages.create(
-            from_=get_twilio_whatsapp_number(),
-            to=phone,
-            body=message
+            from_=_wa_number(settings.TWILIO_WHATSAPP_NUMBER),
+            to=_wa_number(phone),
+            body=text
         )
+        logger.info(f"[send_text] → {phone}: '{text[:60]}'")
     except Exception as e:
-        logger.error(f"Twilio send_text failed for {phone}: {e}")
+        logger.error(f"[send_text] Failed for {phone}: {e}")
 
 
-def _send_voice(phone: str, media_url: str):
-    """Send an audio file via Twilio WhatsApp. Tier 1 — S3 pre-signed URL."""
-    if settings.MOCK_MODE:
-        logger.info(f"MOCK SEND VOICE → {phone}: {media_url[:60]}")
-        return
-
+def _send_audio(phone: str, audio_url: str):
+    """Send audio message via Twilio."""
     try:
         client = get_twilio_client()
-        if not client:
-            return
-
         client.messages.create(
-            from_=get_twilio_whatsapp_number(),
-            to=phone,
-            media_url=[media_url]
+            from_=_wa_number(settings.TWILIO_WHATSAPP_NUMBER),
+            to=_wa_number(phone),
+            media_url=[audio_url]
         )
+        logger.info(f"[send_audio] → {phone}: {audio_url}")
     except Exception as e:
-        logger.error(f"Twilio send_voice failed for {phone}: {e}")
+        logger.error(f"[send_audio] Failed for {phone}: {e}")
 
 
-# ── Parsing Helpers ───────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
+# SESSION MANAGEMENT
+# ─────────────────────────────────────────────────────────────
 
-def _extract_number(text: str) -> Optional[int]:
-    """Extract first integer from text. Handles Bengali digits too."""
-    # Normalize Bengali digits → ASCII
-    bengali_digits = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
-    normalized = text.translate(bengali_digits)
+def _load_or_reset_session(phone: str, user: dict) -> dict:
+    """
+    Load session from user record.
+    If last_active > 5 minutes ago → reset session (new conversation).
+    Returns session dict with guaranteed keys.
+    """
+    now = time.time()
+    last_active = float(user.get("last_active", 0))
+
+    if (now - last_active) > SESSION_TTL_SECONDS and last_active != 0:
+        logger.info(f"[session] {phone} session expired ({now - last_active:.0f}s ago) → reset")
+        return _fresh_session()
+
+    session = {
+        "state":           user.get("session_state", "START"),
+        "language_code":   user.get("language_code", "bn-IN"),
+        "history":         json.loads(user.get("history", "[]")),
+        "session_context": json.loads(user.get("session_context", "{}"))
+    }
+    return session
+
+
+def _fresh_session() -> dict:
+    return {
+        "state":           "START",
+        "language_code":   "bn-IN",
+        "history":         [],
+        "session_context": {}
+    }
+
+
+def _reset_session(phone: str, language: str):
+    """Hard reset — wipe session, keep phone + language."""
+    save_user(phone, {
+        "language_code":   language,
+        "session_state":   "START",
+        "history":         "[]",
+        "session_context": "{}",
+        "last_active":     str(time.time())
+    })
+
+
+def _save_session(phone: str, session: dict, user_msg: str, bot_msg: str):
+    """
+    Append exchange to history (sliding window of HISTORY_WINDOW_SIZE).
+    Save back to DynamoDB user record.
+    """
+    history: list = session.get("history", [])
+    history.append({"role": "user",      "text": user_msg[:200]})
+    history.append({"role": "assistant", "text": bot_msg[:200]})
+
+    # Sliding window — keep only last N pairs
+    if len(history) > HISTORY_WINDOW_SIZE * 2:
+        history = history[-(HISTORY_WINDOW_SIZE * 2):]
+
+    session["history"] = history
+    _save_user(phone, {
+        "session_state":   session.get("state", "START"),
+        "language_code":   session.get("language_code", "bn-IN"),
+        "history":         json.dumps(history),
+        "session_context": json.dumps(session.get("session_context", {})),
+        "last_active":     str(time.time())
+    }, session.get("language_code", "bn-IN"))
+
+
+def _save_user(phone: str, updates: dict, language: str = "bn-IN"):
+    """Save user record with updates."""
+    save_user(phone, {"phone_number": phone, **updates})
+
+
+# ─────────────────────────────────────────────────────────────
+# AUDIO INPUT HANDLING
+# ─────────────────────────────────────────────────────────────
+
+def _handle_audio_input(
+    phone: str, media_url: str, media_type: str, hint_lang: str
+) -> tuple[Optional[str], str]:
+    """
+    Download audio from Twilio URL and transcribe with Sarvam STT.
+    Returns (transcript_text, detected_language) or (None, hint_lang) on failure.
+    """
+    try:
+        # Download audio bytes from Twilio
+        resp = http_requests.get(
+            media_url,
+            auth=(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN),
+            timeout=15
+        )
+        resp.raise_for_status()
+        audio_bytes = resp.content
+    except Exception as e:
+        logger.error(f"[audio] Failed to download from Twilio: {e}")
+        return None, hint_lang
+
+    stt: STTResult = transcribe_audio(audio_bytes, hint_language=hint_lang)
+
+    if stt.is_fallback or not stt.transcript.strip():
+        logger.warning(f"[audio] STT fallback for {phone}")
+        return None, hint_lang
+
+    return stt.transcript, stt.language_code
+
+
+# ─────────────────────────────────────────────────────────────
+# PROFILE EXTRACTION FROM TEXT
+# ─────────────────────────────────────────────────────────────
+
+def _extract_profile_from_text(text: str, existing_ctx: dict) -> dict:
+    """
+    Simple heuristic extraction of profile fields from free text.
+    Merges with existing session context.
+    e.g. "35 year old female SC caste" → {age:35, gender:'female', caste:'sc'}
+    """
     import re
-    match = re.search(r'\d+', normalized)
-    return int(match.group()) if match else None
+    profile = dict(existing_ctx)   # start from existing context
+    lower   = text.lower()
+
+    # Age extraction: "35" or "৩৫" or "35 years"
+    age_match = re.search(r'\b(\d{1,3})\s*(year|বছর|yr|yrs)?', text)
+    if age_match:
+        age = int(age_match.group(1))
+        if 5 < age < 120:
+            profile["age"] = age
+
+    # Gender
+    if any(w in lower for w in ["female", "woman", "mahila", "মহিলা", "lady", "wife"]):
+        profile["gender"] = "female"
+    elif any(w in lower for w in ["male", "man", "পুরুষ", "purush"]):
+        profile["gender"] = "male"
+
+    # Caste
+    if any(w in lower for w in ["sc", "scheduled caste", "তফসিলি জাতি"]):
+        profile["caste"] = "sc"
+    elif any(w in lower for w in ["st", "scheduled tribe", "তফসিলি উপজাতি"]):
+        profile["caste"] = "st"
+    elif any(w in lower for w in ["obc", "অন্যান্য পিছিয়ে পড়া"]):
+        profile["caste"] = "obc"
+    elif any(w in lower for w in ["general", "সাধারণ"]):
+        profile["caste"] = "general"
+
+    # Defaults
+    profile.setdefault("state",                            "west_bengal")
+    profile.setdefault("is_govt_employee",                 False)
+    profile.setdefault("is_income_tax_payer",              False)
+    profile.setdefault("is_enrolled_in_other_cash_scheme", False)
+    profile.setdefault("is_student",                       False)
+    profile.setdefault("is_unemployed",                    False)
+    profile.setdefault("is_unmarried",                     True)
+
+    return profile
 
 
-def _parse_gender(text: str) -> Optional[str]:
-    t = text.lower()
-    if any(k in t for k in ["female", "মহিলা", "woman", "lady", "মা", "বউ", "নারী"]):
-        return "female"
-    if any(k in t for k in ["male", "পুরুষ", "man", "boy", "ছেলে"]):
-        return "male"
-    return None
+# ─────────────────────────────────────────────────────────────
+# UTILITY
+# ─────────────────────────────────────────────────────────────
+
+def _is_reset_command(text: str) -> bool:
+    """Detect restart/reset intent."""
+    lower = text.strip().lower()
+    return lower in {
+        "reset", "restart", "start over", "new", "start",
+        "নতুন", "আবার শুরু", "শুরু", "cancel", "বাতিল"
+    }
 
 
-def _parse_caste(text: str) -> str:
-    t = text.lower()
-    if any(k in t for k in ["sc", "scheduled caste", "তফসিলি জাতি", "2", "২"]):
-        return "sc"
-    if any(k in t for k in ["st", "scheduled tribe", "তফসিলি উপজাতি", "3", "৩"]):
-        return "st"
-    if any(k in t for k in ["obc", "other backward", "4", "৪"]):
-        return "obc"
-    return "general"
-
-
-def _parse_yes_no(text: str) -> bool:
-    t = text.lower()
-    return any(k in t for k in ["yes", "হ্যাঁ", "হা", "ha", "y", "1", "আছে", "আছে", "ok", "ঠিক"])
-
-
-def _is_restart_command(text: str) -> bool:
-    t = text.lower().strip()
-    return any(k in t for k in ["restart", "reset", "শুরু", "নতুন", "start", "hi", "hello",
-                                  "হ্যালো", "নমস্কার", "শুরু করুন"])
+def _t(language: str, bn: str, en: str) -> str:
+    """Simple bilingual string selector. Add hi-IN support if needed."""
+    if language == "bn-IN":
+        return bn
+    return en

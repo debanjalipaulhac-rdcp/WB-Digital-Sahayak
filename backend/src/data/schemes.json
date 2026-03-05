@@ -1,0 +1,1030 @@
+{
+    "_meta": {
+        "version": "2.0",
+        "last_updated": "2025-01-01",
+        "total_schemes": 6,
+        "languages_supported": [
+            "en-IN",
+            "bn-IN",
+            "hi-IN"
+        ],
+        "note": "Each scheme has full eligibility rules + static Q&A with 3-language answers + audio_key for S3 pre-cached audio. audio_key = S3 object key, actual URL resolved at runtime."
+    },
+    "schemes": [
+        {
+            "scheme_id": "lakshmir_bhandar",
+            "scheme_name": "Lakshmir Bhandar",
+            "scheme_name_bn": "লক্ষ্মীর ভাণ্ডার",
+            "scheme_name_hi": "लक्ष्मीर भंडार",
+            "department": "Women & Child Development Department, WB",
+            "tag": "WOMEN",
+            "benefit_display": "₹1,000–₹1,200/month",
+            "apply_at": [
+                {
+                    "office": "BDO Office",
+                    "office_bn": "BDO অফিস",
+                    "step": 1
+                },
+                {
+                    "office": "Duare Sarkar Camp",
+                    "office_bn": "দুয়ারে সরকার ক্যাম্প",
+                    "step": 2
+                }
+            ],
+            "benefits": {
+                "general_monthly": 1000,
+                "sc_st_monthly": 1200,
+                "mode": "DBT",
+                "note_en": "SC/ST women receive ₹1,200/month with valid caste certificate. General category receives ₹1,000/month. Paid directly to bank account.",
+                "note_bn": "SC/ST মহিলারা বৈধ জাতি শংসাপত্রসহ মাসে ₹১,২০০ পাবেন। সাধারণ বিভাগের মহিলারা মাসে ₹১,০০০ পাবেন। সরাসরি ব্যাংক অ্যাকাউন্টে পাঠানো হবে।",
+                "note_hi": "SC/ST महिलाओं को वैध जाति प्रमाणपत्र के साथ ₹1,200/माह मिलेगा। सामान्य वर्ग को ₹1,000/माह। सीधे बैंक खाते में भेजा जाएगा।"
+            },
+            "eligibility": {
+                "gender": "female",
+                "age_min": 25,
+                "age_max": 60,
+                "state_resident": true,
+                "not_govt_employee": true,
+                "not_income_tax_payer": true,
+                "not_enrolled_in_other_cash_scheme": true,
+                "caste_note": "All castes eligible. SC/ST get higher benefit."
+            },
+            "documents": [
+                {
+                    "doc_id": "aadhaar",
+                    "label": "Aadhaar Card",
+                    "label_bn": "আধার কার্ড",
+                    "label_hi": "आधार कार्ड",
+                    "required": true,
+                    "score_deduction_if_missing": 20,
+                    "where_to_get_en": "Nearest Aadhaar Seva Kendra",
+                    "where_to_get_bn": "নিকটতম আধার সেবা কেন্দ্র",
+                    "where_to_get_hi": "नजदीकी आधार सेवा केंद्र"
+                },
+                {
+                    "doc_id": "voter_id",
+                    "label": "Voter ID (EPIC)",
+                    "label_bn": "ভোটার কার্ড",
+                    "label_hi": "मतदाता पहचान पत्र",
+                    "required": true,
+                    "score_deduction_if_missing": 15,
+                    "where_to_get_en": "BLO or Block Office",
+                    "where_to_get_bn": "BLO অথবা ব্লক অফিস",
+                    "where_to_get_hi": "BLO या ब्लॉक कार्यालय"
+                },
+                {
+                    "doc_id": "bank_passbook",
+                    "label": "Bank Passbook",
+                    "label_bn": "ব্যাংক পাসবুক",
+                    "label_hi": "बैंक पासबुक",
+                    "required": true,
+                    "score_deduction_if_missing": 20,
+                    "note_en": "Account must not be dormant. Aadhaar must be linked.",
+                    "note_bn": "অ্যাকাউন্ট নিষ্ক্রিয় থাকলে চলবে না। আধার লিংক থাকতে হবে।",
+                    "note_hi": "खाता निष्क्रिय नहीं होना चाहिए। आधार लिंक होना जरूरी है।",
+                    "where_to_get_en": "Your bank branch",
+                    "where_to_get_bn": "আপনার ব্যাংক শাখা",
+                    "where_to_get_hi": "आपकी बैंक शाखा"
+                },
+                {
+                    "doc_id": "ration_card",
+                    "label": "Ration Card",
+                    "label_bn": "রেশন কার্ড",
+                    "label_hi": "राशन कार्ड",
+                    "required": false,
+                    "score_deduction_if_missing": 5,
+                    "note_en": "Address must match Voter ID. Not mandatory but recommended.",
+                    "note_bn": "ঠিকানা ভোটার কার্ডের সাথে মিলতে হবে। বাধ্যতামূলক নয় কিন্তু প্রস্তাবিত।",
+                    "note_hi": "पता मतदाता पहचान पत्र से मेल खाना चाहिए।"
+                },
+                {
+                    "doc_id": "caste_certificate",
+                    "label": "Caste Certificate",
+                    "label_bn": "জাতি শংসাপত্র",
+                    "label_hi": "जाति प्रमाणपत्र",
+                    "required": false,
+                    "score_deduction_if_missing": 0,
+                    "note_en": "Required only for SC/ST women to receive ₹1,200 instead of ₹1,000.",
+                    "note_bn": "শুধুমাত্র SC/ST মহিলাদের জন্য যারা ₹১,২০০ পেতে চান।",
+                    "note_hi": "केवल SC/ST महिलाओं के लिए जो ₹1,200 पाना चाहती हैं।",
+                    "where_to_get_en": "SDO Office or BDO Office",
+                    "where_to_get_bn": "SDO অফিস বা BDO অফিস",
+                    "where_to_get_hi": "SDO कार्यालय या BDO कार्यालय"
+                }
+            ],
+            "mismatch_checks": [
+                {
+                    "check_id": "name_aadhaar_bank",
+                    "field": "name",
+                    "doc_a": "aadhaar",
+                    "doc_b": "bank_passbook",
+                    "label_a": "Aadhaar",
+                    "label_b": "Bank Passbook",
+                    "severity": "FATAL",
+                    "score_deduction": 35,
+                    "script_code": "NAME_MISMATCH",
+                    "message_en": "Name on Aadhaar must exactly match Bank Passbook. One letter difference = rejection.",
+                    "message_bn": "আধার কার্ডের নাম এবং ব্যাংক পাসবুকের নাম একদম একই হতে হবে। একটি অক্ষরের পার্থক্যেও আবেদন বাতিল হবে।",
+                    "message_hi": "आधार और बैंक पासबुक का नाम बिल्कुल एक जैसा होना चाहिए।"
+                },
+                {
+                    "check_id": "name_aadhaar_voter",
+                    "field": "name",
+                    "doc_a": "aadhaar",
+                    "doc_b": "voter_id",
+                    "label_a": "Aadhaar",
+                    "label_b": "Voter ID",
+                    "severity": "WARNING",
+                    "score_deduction": 15,
+                    "script_code": "NAME_MISMATCH",
+                    "message_en": "Name on Aadhaar should match Voter ID. Minor mismatch may delay verification.",
+                    "message_bn": "আধার কার্ডের নাম ভোটার কার্ডের সাথে মিলতে হবে। ছোট পার্থক্যেও যাচাইকরণে বিলম্ব হতে পারে।",
+                    "message_hi": "आधार का नाम मतदाता पहचान पत्र से मेल खाना चाहिए।"
+                },
+                {
+                    "check_id": "address_ration_voter",
+                    "field": "address",
+                    "doc_a": "ration_card",
+                    "doc_b": "voter_id",
+                    "label_a": "Ration Card",
+                    "label_b": "Voter ID",
+                    "severity": "WARNING",
+                    "score_deduction": 10,
+                    "script_code": "ADDRESS_MISMATCH",
+                    "message_en": "Address on Ration Card should match Voter ID.",
+                    "message_bn": "রেশন কার্ডের ঠিকানা ভোটার কার্ডের ঠিকানার সাথে মিলতে হবে।",
+                    "message_hi": "राशन कार्ड का पता मतदाता पहचान पत्र से मेल खाना चाहिए।"
+                }
+            ],
+            "bank_conditions": {
+                "account_required": true,
+                "aadhaar_linked_required": true,
+                "dormant_check": true,
+                "dormant_threshold_months": 6,
+                "score_deduction_dormant": 25,
+                "score_deduction_unlinked": 25,
+                "script_code_dormant": "DORMANT_ACCOUNT",
+                "script_code_unlinked": "AADHAAR_UNLINKED"
+            },
+            "cross_scheme_triggers": [
+                {
+                    "condition": "has_daughter",
+                    "suggest_scheme_id": "kanyashree",
+                    "reason_en": "Your daughter may qualify for Kanyashree — ₹25,000 grant at age 18.",
+                    "reason_bn": "আপনার মেয়ে কন্যাশ্রীর জন্য যোগ্য হতে পারে — ১৮ বছরে ₹২৫,০০০।",
+                    "reason_hi": "आपकी बेटी कन्याश्री के लिए पात्र हो सकती है — 18 साल में ₹25,000।"
+                },
+                {
+                    "condition": "always",
+                    "suggest_scheme_id": "swasthya_sathi",
+                    "reason_en": "Your family may qualify for ₹5 lakh annual health cover under Swasthya Sathi.",
+                    "reason_bn": "আপনার পরিবার স্বাস্থ্যসাথীর আওতায় বার্ষিক ₹৫ লাখ স্বাস্থ্য সুরক্ষা পেতে পারেন।",
+                    "reason_hi": "आपका परिवार स्वास्थ्य साथी के तहत ₹5 लाख वार्षिक स्वास्थ्य बीमा पा सकता है।"
+                }
+            ],
+            "static_qa": [
+                {
+                    "qa_id": "lb_documents",
+                    "question_variants": [
+                        "what documents are needed for lakshmir bhandar",
+                        "lakshmir bhandar documents required",
+                        "কি কি কাগজ লাগবে লক্ষ্মীর ভাণ্ডার",
+                        "লক্ষ্মীর ভাণ্ডারের জন্য কী কী কাগজ লাগে",
+                        "লক্ষ্মীর ভাণ্ডার কাগজপত্র"
+                    ],
+                    "answer": {
+                        "en-IN": "For Lakshmir Bhandar, you need: Aadhaar Card, Voter ID, and Bank Passbook. Your Aadhaar name and Bank Passbook name must match exactly. For SC/ST women, also bring your Caste Certificate to receive ₹1,200 instead of ₹1,000.",
+                        "bn-IN": "লক্ষ্মীর ভাণ্ডারের জন্য আপনার লাগবে: আধার কার্ড, ভোটার কার্ড এবং ব্যাংক পাসবুক। আধার কার্ডের নাম এবং ব্যাংক পাসবুকের নাম একদম একই হতে হবে। SC/ST মহিলাদের জন্য জাতি শংসাপত্রও আনুন, তাহলে ₹১,২০০ পাবেন।",
+                        "hi-IN": "लक्ष्मीर भंडार के लिए चाहिए: आधार कार्ड, मतदाता पहचान पत्र और बैंक पासबुक। आधार और पासबुक पर नाम बिल्कुल एक जैसा होना चाहिए। SC/ST महिलाओं के लिए जाति प्रमाणपत्र भी लाएं।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/lakshmir_bhandar/lb_documents_en.ogg",
+                        "bn-IN": "qa/lakshmir_bhandar/lb_documents_bn.ogg",
+                        "hi-IN": "qa/lakshmir_bhandar/lb_documents_hi.ogg"
+                    }
+                },
+                {
+                    "qa_id": "lb_eligibility",
+                    "question_variants": [
+                        "who is eligible for lakshmir bhandar",
+                        "lakshmir bhandar eligibility criteria",
+                        "লক্ষ্মীর ভাণ্ডার কে পাবে",
+                        "লক্ষ্মীর ভাণ্ডারের যোগ্যতা কী",
+                        "কারা লক্ষ্মীর ভাণ্ডার পাবেন"
+                    ],
+                    "answer": {
+                        "en-IN": "Lakshmir Bhandar is for women aged 25 to 60 who are residents of West Bengal. You must not be a government employee and must not pay income tax. All castes are welcome. SC/ST women get ₹1,200 per month, others get ₹1,000 per month.",
+                        "bn-IN": "লক্ষ্মীর ভাণ্ডার পশ্চিমবঙ্গের ২৫ থেকে ৬০ বছর বয়সী মহিলাদের জন্য। আপনাকে সরকারি চাকরি করলে বা আয়কর দিলে চলবে না। সব জাতির মহিলারা আবেদন করতে পারবেন। SC/ST মহিলারা মাসে ₹১,২০০ এবং অন্যরা ₹১,০০০ পাবেন।",
+                        "hi-IN": "लक्ष्मीर भंडार 25 से 60 साल की पश्चिम बंगाल की महिलाओं के लिए है। सरकारी नौकरी या आयकर देने वाली महिलाएं पात्र नहीं हैं। SC/ST को ₹1,200 और बाकी को ₹1,000 प्रति माह मिलेगा।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/lakshmir_bhandar/lb_eligibility_en.ogg",
+                        "bn-IN": "qa/lakshmir_bhandar/lb_eligibility_bn.ogg",
+                        "hi-IN": "qa/lakshmir_bhandar/lb_eligibility_hi.ogg"
+                    }
+                },
+                {
+                    "qa_id": "lb_benefit",
+                    "question_variants": [
+                        "how much money from lakshmir bhandar",
+                        "lakshmir bhandar benefit amount",
+                        "লক্ষ্মীর ভাণ্ডারে কত টাকা পাওয়া যায়",
+                        "লক্ষ্মীর ভাণ্ডারের সুবিধা কী",
+                        "কত টাকা পাব লক্ষ্মীর ভাণ্ডার থেকে"
+                    ],
+                    "answer": {
+                        "en-IN": "Lakshmir Bhandar gives ₹1,000 per month for general category women and ₹1,200 per month for SC/ST women. Money is sent directly to your bank account every month.",
+                        "bn-IN": "লক্ষ্মীর ভাণ্ডারে সাধারণ বিভাগের মহিলারা মাসে ₹১,০০০ এবং SC/ST মহিলারা মাসে ₹১,২০০ পাবেন। টাকা সরাসরি প্রতি মাসে আপনার ব্যাংক অ্যাকাউন্টে পাঠানো হবে।",
+                        "hi-IN": "लक्ष्मीर भंडार में सामान्य वर्ग को ₹1,000 और SC/ST को ₹1,200 प्रति माह मिलता है। पैसा सीधे बैंक खाते में भेजा जाता है।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/lakshmir_bhandar/lb_benefit_en.ogg",
+                        "bn-IN": "qa/lakshmir_bhandar/lb_benefit_bn.ogg",
+                        "hi-IN": "qa/lakshmir_bhandar/lb_benefit_hi.ogg"
+                    }
+                },
+                {
+                    "qa_id": "lb_apply_where",
+                    "question_variants": [
+                        "where to apply for lakshmir bhandar",
+                        "how to apply lakshmir bhandar",
+                        "লক্ষ্মীর ভাণ্ডার কোথায় আবেদন করব",
+                        "লক্ষ্মীর ভাণ্ডার আবেদন কীভাবে করব"
+                    ],
+                    "answer": {
+                        "en-IN": "You can apply for Lakshmir Bhandar at the BDO Office in your block or at the nearest Duare Sarkar camp. Bring all your documents and go in the morning to avoid long queues.",
+                        "bn-IN": "লক্ষ্মীর ভাণ্ডারের জন্য আপনার ব্লকের BDO অফিস বা নিকটতম দুয়ারে সরকার ক্যাম্পে আবেদন করুন। সমস্ত কাগজপত্র নিয়ে সকালে যান যাতে লম্বা লাইনে না থাকতে হয়।",
+                        "hi-IN": "लक्ष्मीर भंडार के लिए अपने ब्लॉक के BDO कार्यालय या नजदीकी दुआरे सरकार कैंप में आवेदन करें।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/lakshmir_bhandar/lb_apply_where_en.ogg",
+                        "bn-IN": "qa/lakshmir_bhandar/lb_apply_where_bn.ogg",
+                        "hi-IN": "qa/lakshmir_bhandar/lb_apply_where_hi.ogg"
+                    }
+                }
+            ]
+        },
+        {
+            "scheme_id": "swasthya_sathi",
+            "scheme_name": "Swasthya Sathi",
+            "scheme_name_bn": "স্বাস্থ্য সাথী",
+            "scheme_name_hi": "स्वास्थ्य साथी",
+            "department": "Health & Family Welfare Department, WB",
+            "tag": "HEALTH",
+            "benefit_display": "₹5 lakh health cover/year",
+            "apply_at": [
+                {
+                    "office": "BDO Office",
+                    "office_bn": "BDO অফিস",
+                    "step": 1
+                },
+                {
+                    "office": "District Health Office",
+                    "office_bn": "জেলা স্বাস্থ্য অফিস",
+                    "step": 2
+                }
+            ],
+            "benefits": {
+                "cashless_limit": 500000,
+                "mode": "Cashless at empanelled hospitals",
+                "note_en": "Covers entire family. Smart card issued to female head of household. Cashless treatment at empanelled hospitals.",
+                "note_bn": "পুরো পরিবার অন্তর্ভুক্ত। পরিবারের মহিলা প্রধানকে স্মার্ট কার্ড দেওয়া হয়। তালিকাভুক্ত হাসপাতালে বিনামূল্যে চিকিৎসা।",
+                "note_hi": "पूरा परिवार शामिल। परिवार की महिला मुखिया को स्मार्ट कार्ड। सूचीबद्ध अस्पतालों में मुफ्त इलाज।"
+            },
+            "eligibility": {
+                "gender": "all",
+                "age_min": 0,
+                "age_max": 999,
+                "state_resident": true,
+                "family_card_holder": true,
+                "note_en": "Any West Bengal family with a Ration Card or equivalent proof of residence.",
+                "note_bn": "রেশন কার্ড বা বাসস্থানের প্রমাণ সহ যেকোনো পশ্চিমবঙ্গ পরিবার।",
+                "note_hi": "राशन कार्ड या निवास प्रमाण के साथ कोई भी पश्चिम बंगाल परिवार।"
+            },
+            "documents": [
+                {
+                    "doc_id": "aadhaar",
+                    "label": "Aadhaar Card",
+                    "label_bn": "আধার কার্ড",
+                    "label_hi": "आधार कार्ड",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                },
+                {
+                    "doc_id": "ration_card",
+                    "label": "Ration Card",
+                    "label_bn": "রেশন কার্ড",
+                    "label_hi": "राशन कार्ड",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                },
+                {
+                    "doc_id": "bank_passbook",
+                    "label": "Bank Passbook",
+                    "label_bn": "ব্যাংক পাসবুক",
+                    "label_hi": "बैंक पासबुक",
+                    "required": false,
+                    "score_deduction_if_missing": 5
+                }
+            ],
+            "mismatch_checks": [],
+            "bank_conditions": {
+                "account_required": false,
+                "aadhaar_linked_required": false,
+                "dormant_check": false
+            },
+            "cross_scheme_triggers": [],
+            "static_qa": [
+                {
+                    "qa_id": "ss_documents",
+                    "question_variants": [
+                        "what documents for swasthya sathi",
+                        "swasthya sathi documents required",
+                        "স্বাস্থ্যসাথীর জন্য কী কী কাগজ লাগে",
+                        "স্বাস্থ্যসাথী কাগজপত্র"
+                    ],
+                    "answer": {
+                        "en-IN": "For Swasthya Sathi, you need Aadhaar Card and Ration Card. The smart card is issued to the female head of the family.",
+                        "bn-IN": "স্বাস্থ্যসাথীর জন্য আধার কার্ড এবং রেশন কার্ড লাগবে। স্মার্ট কার্ড পরিবারের মহিলা প্রধানকে দেওয়া হয়।",
+                        "hi-IN": "स्वास्थ्य साथी के लिए आधार कार्ड और राशन कार्ड चाहिए। स्मार्ट कार्ड परिवार की महिला मुखिया को मिलता है।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/swasthya_sathi/ss_documents_en.ogg",
+                        "bn-IN": "qa/swasthya_sathi/ss_documents_bn.ogg",
+                        "hi-IN": "qa/swasthya_sathi/ss_documents_hi.ogg"
+                    }
+                },
+                {
+                    "qa_id": "ss_benefit",
+                    "question_variants": [
+                        "what is swasthya sathi benefit",
+                        "swasthya sathi coverage",
+                        "স্বাস্থ্যসাথীতে কত টাকা পাওয়া যায়",
+                        "স্বাস্থ্যসাথীর সুবিধা কী"
+                    ],
+                    "answer": {
+                        "en-IN": "Swasthya Sathi gives your entire family ₹5 lakh of health insurance every year. You can get free treatment at any empanelled government or private hospital in West Bengal.",
+                        "bn-IN": "স্বাস্থ্যসাথীতে আপনার পুরো পরিবার প্রতি বছর ₹৫ লাখের স্বাস্থ্য বীমা পাবেন। পশ্চিমবঙ্গের যেকোনো তালিকাভুক্ত সরকারি বা বেসরকারি হাসপাতালে বিনামূল্যে চিকিৎসা পাবেন।",
+                        "hi-IN": "स्वास्थ्य साथी से आपके पूरे परिवार को हर साल ₹5 लाख का स्वास्थ्य बीमा मिलता है। पश्चिम बंगाल के किसी भी सूचीबद्ध अस्पताल में मुफ्त इलाज।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/swasthya_sathi/ss_benefit_en.ogg",
+                        "bn-IN": "qa/swasthya_sathi/ss_benefit_bn.ogg",
+                        "hi-IN": "qa/swasthya_sathi/ss_benefit_hi.ogg"
+                    }
+                }
+            ]
+        },
+        {
+            "scheme_id": "kanyashree",
+            "scheme_name": "Kanyashree Prakalpa",
+            "scheme_name_bn": "কন্যাশ্রী প্রকল্প",
+            "scheme_name_hi": "कन्याश्री प्रकल्प",
+            "department": "Women & Child Development Department, WB",
+            "tag": "GIRL_CHILD",
+            "benefit_display": "₹1,000/year + ₹25,000 at 18",
+            "apply_at": [
+                {
+                    "office": "School (for K1)",
+                    "office_bn": "স্কুল (K1 এর জন্য)",
+                    "step": 1
+                },
+                {
+                    "office": "BDO Office (for K2)",
+                    "office_bn": "BDO অফিস (K2 এর জন্য)",
+                    "step": 2
+                }
+            ],
+            "benefits": {
+                "k1_annual": 1000,
+                "k2_one_time": 25000,
+                "mode": "DBT",
+                "note_en": "K1: ₹1,000/year for girls aged 13-18 in school. K2: ₹25,000 one-time grant at age 18 if unmarried and in education.",
+                "note_bn": "K1: স্কুলে পড়া ১৩-১৮ বছর বয়সী মেয়েদের জন্য বার্ষিক ₹১,০০০। K2: ১৮ বছরে অবিবাহিত এবং পড়াশোনা চালিয়ে গেলে একবার ₹২৫,০০০।",
+                "note_hi": "K1: स्कूल में पढ़ने वाली 13-18 साल की बच्चियों को ₹1,000/वर्ष। K2: 18 साल में अविवाहित और शिक्षा जारी रखने पर ₹25,000 एकमुश्त।"
+            },
+            "eligibility": {
+                "gender": "female",
+                "age_min": 13,
+                "age_max": 18,
+                "state_resident": true,
+                "must_be_enrolled_in_school": true,
+                "must_be_unmarried": true,
+                "family_income_max": null,
+                "note_en": "Girl must be enrolled in a government or aided school. Must be unmarried. No strict income limit for K1."
+            },
+            "documents": [
+                {
+                    "doc_id": "aadhaar",
+                    "label": "Aadhaar Card",
+                    "label_bn": "আধার কার্ড",
+                    "label_hi": "आधार कार्ड",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                },
+                {
+                    "doc_id": "school_enrollment",
+                    "label": "School Enrollment Certificate",
+                    "label_bn": "স্কুলে ভর্তির শংসাপত্র",
+                    "label_hi": "स्कूल नामांकन प्रमाणपत्र",
+                    "required": true,
+                    "score_deduction_if_missing": 25
+                },
+                {
+                    "doc_id": "birth_certificate",
+                    "label": "Birth Certificate",
+                    "label_bn": "জন্ম শংসাপত্র",
+                    "label_hi": "जन्म प्रमाणपत्र",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                },
+                {
+                    "doc_id": "bank_passbook",
+                    "label": "Bank Passbook (Girl's own account)",
+                    "label_bn": "ব্যাংক পাসবুক (মেয়ের নিজস্ব অ্যাকাউন্ট)",
+                    "label_hi": "बैंक पासबुक (बच्ची का अपना खाता)",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                }
+            ],
+            "mismatch_checks": [
+                {
+                    "check_id": "dob_aadhaar_birth_cert",
+                    "field": "date_of_birth",
+                    "doc_a": "aadhaar",
+                    "doc_b": "birth_certificate",
+                    "label_a": "Aadhaar DOB",
+                    "label_b": "Birth Certificate DOB",
+                    "severity": "FATAL",
+                    "score_deduction": 30,
+                    "script_code": "DOB_MISMATCH",
+                    "message_en": "Date of birth on Aadhaar must match Birth Certificate.",
+                    "message_bn": "আধার কার্ডের জন্ম তারিখ এবং জন্ম শংসাপত্রের জন্ম তারিখ একই হতে হবে।",
+                    "message_hi": "आधार और जन्म प्रमाणपत्र पर जन्म तिथि एक जैसी होनी चाहिए।"
+                }
+            ],
+            "bank_conditions": {
+                "account_required": true,
+                "aadhaar_linked_required": true,
+                "dormant_check": true,
+                "dormant_threshold_months": 6,
+                "score_deduction_dormant": 25,
+                "score_deduction_unlinked": 20,
+                "script_code_dormant": "DORMANT_ACCOUNT",
+                "script_code_unlinked": "AADHAAR_UNLINKED"
+            },
+            "cross_scheme_triggers": [
+                {
+                    "condition": "always",
+                    "suggest_scheme_id": "swasthya_sathi",
+                    "reason_en": "Family may qualify for ₹5 lakh health cover.",
+                    "reason_bn": "পরিবার ₹৫ লাখ স্বাস্থ্য সুরক্ষা পেতে পারেন।",
+                    "reason_hi": "परिवार ₹5 लाख स्वास्थ्य बीमा पा सकता है।"
+                }
+            ],
+            "static_qa": [
+                {
+                    "qa_id": "ks_documents",
+                    "question_variants": [
+                        "what documents for kanyashree",
+                        "kanyashree documents required",
+                        "কন্যাশ্রীর জন্য কী কী কাগজ লাগে",
+                        "কন্যাশ্রী কাগজপত্র"
+                    ],
+                    "answer": {
+                        "en-IN": "For Kanyashree, you need Aadhaar Card, School Enrollment Certificate, Birth Certificate, and the girl's own Bank Passbook. The date of birth on Aadhaar and Birth Certificate must match exactly.",
+                        "bn-IN": "কন্যাশ্রীর জন্য লাগবে: আধার কার্ড, স্কুলে ভর্তির শংসাপত্র, জন্ম শংসাপত্র এবং মেয়ের নিজস্ব ব্যাংক পাসবুক। আধার কার্ড এবং জন্ম শংসাপত্রে জন্ম তারিখ একই হতে হবে।",
+                        "hi-IN": "कन्याश्री के लिए चाहिए: आधार कार्ड, स्कूल नामांकन प्रमाणपत्र, जन्म प्रमाणपत्र और बच्ची का अपना बैंक पासबुक।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/kanyashree/ks_documents_en.ogg",
+                        "bn-IN": "qa/kanyashree/ks_documents_bn.ogg",
+                        "hi-IN": "qa/kanyashree/ks_documents_hi.ogg"
+                    }
+                },
+                {
+                    "qa_id": "ks_benefit",
+                    "question_variants": [
+                        "how much money from kanyashree",
+                        "kanyashree benefit amount",
+                        "কন্যাশ্রীতে কত টাকা পাওয়া যায়",
+                        "কন্যাশ্রীর সুবিধা কী"
+                    ],
+                    "answer": {
+                        "en-IN": "Kanyashree has two parts. K1 gives ₹1,000 every year to girls aged 13 to 18 who are in school. K2 gives a one-time ₹25,000 grant when the girl turns 18, if she is unmarried and still in education.",
+                        "bn-IN": "কন্যাশ্রীর দুটি অংশ। K1 তে স্কুলে পড়া ১৩ থেকে ১৮ বছরের মেয়েরা প্রতি বছর ₹১,০০০ পাবে। K2 তে মেয়ের ১৮ বছর হলে, অবিবাহিত থাকলে এবং পড়াশোনা চালিয়ে গেলে একবার ₹২৫,০০০ পাবে।",
+                        "hi-IN": "कन्याश्री के दो हिस्से हैं। K1 में 13-18 साल की स्कूली बच्चियों को हर साल ₹1,000 मिलता है। K2 में 18 साल पर अविवाहित और पढ़ाई जारी रखने पर ₹25,000 एकमुश्त मिलता है।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/kanyashree/ks_benefit_en.ogg",
+                        "bn-IN": "qa/kanyashree/ks_benefit_bn.ogg",
+                        "hi-IN": "qa/kanyashree/ks_benefit_hi.ogg"
+                    }
+                }
+            ]
+        },
+        {
+            "scheme_id": "rupashree",
+            "scheme_name": "Rupashree Prakalpa",
+            "scheme_name_bn": "রূপশ্রী প্রকল্প",
+            "scheme_name_hi": "रूपश्री प्रकल्प",
+            "department": "Women & Child Development Department, WB",
+            "tag": "MARRIAGE",
+            "benefit_display": "₹25,000 one-time grant",
+            "apply_at": [
+                {
+                    "office": "BDO Office",
+                    "office_bn": "BDO অফিস",
+                    "step": 1
+                }
+            ],
+            "benefits": {
+                "one_time_grant": 25000,
+                "mode": "DBT",
+                "note_en": "One-time marriage assistance of ₹25,000 for economically weaker families. Bride must be 18+.",
+                "note_bn": "অর্থনৈতিকভাবে দুর্বল পরিবারের জন্য ₹২৫,০০০ একবারের বিবাহ সহায়তা। বধূকে ১৮+ বছর হতে হবে।",
+                "note_hi": "आर्थिक रूप से कमजोर परिवारों के लिए ₹25,000 एकमुश्त विवाह सहायता। दुल्हन की उम्र 18+ होनी चाहिए।"
+            },
+            "eligibility": {
+                "gender": "female",
+                "age_min": 18,
+                "age_max": 40,
+                "state_resident": true,
+                "family_income_max": 150000,
+                "note_en": "Family annual income must be below ₹1.5 lakh."
+            },
+            "documents": [
+                {
+                    "doc_id": "aadhaar",
+                    "label": "Aadhaar Card",
+                    "label_bn": "আধার কার্ড",
+                    "label_hi": "आधार कार्ड",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                },
+                {
+                    "doc_id": "age_proof",
+                    "label": "Age Proof (Birth Certificate or Marksheet)",
+                    "label_bn": "বয়সের প্রমাণ (জন্ম শংসাপত্র বা মার্কশিট)",
+                    "label_hi": "आयु प्रमाण",
+                    "required": true,
+                    "score_deduction_if_missing": 25
+                },
+                {
+                    "doc_id": "income_certificate",
+                    "label": "Income Certificate",
+                    "label_bn": "আয় শংসাপত্র",
+                    "label_hi": "आय प्रमाणपत्र",
+                    "required": true,
+                    "score_deduction_if_missing": 25,
+                    "where_to_get_en": "BDO Office or SDO Office",
+                    "where_to_get_bn": "BDO অফিস বা SDO অফিস"
+                },
+                {
+                    "doc_id": "bank_passbook",
+                    "label": "Bank Passbook (Bride)",
+                    "label_bn": "ব্যাংক পাসবুক (বধূ)",
+                    "label_hi": "बैंक पासबुक (दुल्हन)",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                }
+            ],
+            "mismatch_checks": [
+                {
+                    "check_id": "dob_aadhaar_age",
+                    "field": "date_of_birth",
+                    "doc_a": "aadhaar",
+                    "doc_b": "age_proof",
+                    "severity": "FATAL",
+                    "score_deduction": 30,
+                    "script_code": "DOB_MISMATCH",
+                    "message_en": "Bride must be 18+ and DOB must match across documents.",
+                    "message_bn": "বধূকে ১৮ বছরের বেশি হতে হবে এবং সমস্ত কাগজে জন্ম তারিখ একই হতে হবে।",
+                    "message_hi": "दुल्हन की उम्र 18+ होनी चाहिए और जन्म तिथि सभी दस्तावेजों में एक जैसी होनी चाहिए।"
+                }
+            ],
+            "bank_conditions": {
+                "account_required": true,
+                "aadhaar_linked_required": true,
+                "dormant_check": true,
+                "dormant_threshold_months": 6,
+                "score_deduction_dormant": 25,
+                "score_deduction_unlinked": 25,
+                "script_code_dormant": "DORMANT_ACCOUNT",
+                "script_code_unlinked": "AADHAAR_UNLINKED"
+            },
+            "cross_scheme_triggers": [],
+            "static_qa": [
+                {
+                    "qa_id": "rp_documents",
+                    "question_variants": [
+                        "rupashree documents required",
+                        "what documents for rupashree",
+                        "রূপশ্রীর জন্য কী কী কাগজ লাগে",
+                        "রূপশ্রী কাগজপত্র"
+                    ],
+                    "answer": {
+                        "en-IN": "For Rupashree, you need Aadhaar Card, Age Proof such as Birth Certificate or Marksheet, Income Certificate, and the bride's Bank Passbook. Family income must be below ₹1.5 lakh per year.",
+                        "bn-IN": "রূপশ্রীর জন্য লাগবে: আধার কার্ড, বয়সের প্রমাণ যেমন জন্ম শংসাপত্র বা মার্কশিট, আয় শংসাপত্র এবং বধূর ব্যাংক পাসবুক। পরিবারের বার্ষিক আয় ₹১.৫ লাখের কম হতে হবে।",
+                        "hi-IN": "रूपश्री के लिए चाहिए: आधार कार्ड, आयु प्रमाण, आय प्रमाणपत्र और दुल्हन का बैंक पासबुक। पारिवारिक वार्षिक आय ₹1.5 लाख से कम होनी चाहिए।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/rupashree/rp_documents_en.ogg",
+                        "bn-IN": "qa/rupashree/rp_documents_bn.ogg",
+                        "hi-IN": "qa/rupashree/rp_documents_hi.ogg"
+                    }
+                }
+            ]
+        },
+        {
+            "scheme_id": "yuva_sathi",
+            "scheme_name": "Yuva Sathi",
+            "scheme_name_bn": "যুবসাথী",
+            "scheme_name_hi": "युवा साथी",
+            "department": "Labour Department, WB",
+            "tag": "YOUTH",
+            "benefit_display": "₹1,500–₹2,000/month",
+            "apply_at": [
+                {
+                    "office": "Employment Exchange Office",
+                    "office_bn": "কর্মসংস্থান এক্সচেঞ্জ অফিস",
+                    "step": 1
+                }
+            ],
+            "benefits": {
+                "graduate_monthly": 2000,
+                "non_graduate_monthly": 1500,
+                "mode": "DBT",
+                "duration_max_months": 24,
+                "note_en": "Graduates get ₹2,000/month, non-graduates get ₹1,500/month. Maximum 2 years.",
+                "note_bn": "স্নাতকরা মাসে ₹২,০০০ এবং অ-স্নাতকরা মাসে ₹১,৫০০ পাবেন। সর্বোচ্চ ২ বছর।",
+                "note_hi": "स्नातक को ₹2,000/माह, गैर-स्नातक को ₹1,500/माह। अधिकतम 2 साल।"
+            },
+            "eligibility": {
+                "gender": "all",
+                "age_min": 18,
+                "age_max": 45,
+                "state_resident": true,
+                "must_be_unemployed": true,
+                "must_be_registered_at_employment_exchange": true,
+                "note_en": "Must be unemployed and registered at the Employment Exchange."
+            },
+            "documents": [
+                {
+                    "doc_id": "aadhaar",
+                    "label": "Aadhaar Card",
+                    "label_bn": "আধার কার্ড",
+                    "label_hi": "आधार कार्ड",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                },
+                {
+                    "doc_id": "employment_exchange_card",
+                    "label": "Employment Exchange Registration Card",
+                    "label_bn": "কর্মসংস্থান এক্সচেঞ্জ নিবন্ধন কার্ড",
+                    "label_hi": "रोजगार कार्यालय पंजीकरण कार्ड",
+                    "required": true,
+                    "score_deduction_if_missing": 30,
+                    "where_to_get_en": "District Employment Exchange Office",
+                    "where_to_get_bn": "জেলা কর্মসংস্থান এক্সচেঞ্জ অফিস"
+                },
+                {
+                    "doc_id": "educational_certificate",
+                    "label": "Educational Certificate (Madhyamik / HS / Degree)",
+                    "label_bn": "শিক্ষাগত শংসাপত্র",
+                    "label_hi": "शैक्षिक प्रमाणपत्र",
+                    "required": true,
+                    "score_deduction_if_missing": 15
+                },
+                {
+                    "doc_id": "bank_passbook",
+                    "label": "Bank Passbook",
+                    "label_bn": "ব্যাংক পাসবুক",
+                    "label_hi": "बैंक पासबुक",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                }
+            ],
+            "mismatch_checks": [],
+            "bank_conditions": {
+                "account_required": true,
+                "aadhaar_linked_required": true,
+                "dormant_check": true,
+                "dormant_threshold_months": 6,
+                "score_deduction_dormant": 25,
+                "score_deduction_unlinked": 20,
+                "script_code_dormant": "DORMANT_ACCOUNT",
+                "script_code_unlinked": "AADHAAR_UNLINKED"
+            },
+            "cross_scheme_triggers": [],
+            "static_qa": [
+                {
+                    "qa_id": "ys_eligibility",
+                    "question_variants": [
+                        "yuva sathi eligibility",
+                        "who can apply for yuva sathi",
+                        "যুবসাথীর যোগ্যতা",
+                        "কারা যুবসাথী পাবেন"
+                    ],
+                    "answer": {
+                        "en-IN": "Yuva Sathi is for unemployed youth aged 18 to 45 in West Bengal. You must be registered at the Employment Exchange. Graduates get ₹2,000 per month and non-graduates get ₹1,500 per month for up to 2 years.",
+                        "bn-IN": "যুবসাথী পশ্চিমবঙ্গের ১৮ থেকে ৪৫ বছর বয়সী বেকার যুবকদের জন্য। কর্মসংস্থান এক্সচেঞ্জে নিবন্ধিত হতে হবে। স্নাতকরা মাসে ₹২,০০০ এবং অ-স্নাতকরা ₹১,৫০০ পাবেন। সর্বোচ্চ ২ বছর।",
+                        "hi-IN": "युवा साथी 18 से 45 साल के बेरोजगार युवाओं के लिए है। रोजगार कार्यालय में पंजीकृत होना जरूरी है। स्नातक को ₹2,000 और गैर-स्नातक को ₹1,500 प्रति माह, अधिकतम 2 साल।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/yuva_sathi/ys_eligibility_en.ogg",
+                        "bn-IN": "qa/yuva_sathi/ys_eligibility_bn.ogg",
+                        "hi-IN": "qa/yuva_sathi/ys_eligibility_hi.ogg"
+                    }
+                }
+            ]
+        },
+        {
+            "scheme_id": "samajik_suraksha",
+            "scheme_name": "Samajik Suraksha Yojana",
+            "scheme_name_bn": "সামাজিক সুরক্ষা যোজনা",
+            "scheme_name_hi": "सामाजिक सुरक्षा योजना",
+            "department": "Social Welfare Department, WB",
+            "tag": "PENSION",
+            "benefit_display": "₹1,000/month pension",
+            "apply_at": [
+                {
+                    "office": "BDO Office",
+                    "office_bn": "BDO অফিস",
+                    "step": 1
+                }
+            ],
+            "benefits": {
+                "monthly_pension": 1000,
+                "mode": "DBT",
+                "note_en": "Monthly pension for elderly (60+), widows, and disabled citizens with low income.",
+                "note_bn": "বয়স্ক (৬০+), বিধবা এবং কম আয়ের প্রতিবন্ধী নাগরিকদের জন্য মাসিক পেনশন।",
+                "note_hi": "वृद्ध (60+), विधवाओं और कम आय के दिव्यांग नागरिकों के लिए मासिक पेंशन।"
+            },
+            "eligibility": {
+                "gender": "all",
+                "age_min": 60,
+                "age_max": 999,
+                "state_resident": true,
+                "low_income": true,
+                "note_en": "Age 60+ OR widow OR person with disability. Must have low income."
+            },
+            "documents": [
+                {
+                    "doc_id": "aadhaar",
+                    "label": "Aadhaar Card",
+                    "label_bn": "আধার কার্ড",
+                    "label_hi": "आधार कार्ड",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                },
+                {
+                    "doc_id": "age_proof",
+                    "label": "Age Proof",
+                    "label_bn": "বয়সের প্রমাণ",
+                    "label_hi": "आयु प्रमाण",
+                    "required": true,
+                    "score_deduction_if_missing": 25
+                },
+                {
+                    "doc_id": "bank_passbook",
+                    "label": "Bank Passbook",
+                    "label_bn": "ব্যাংক পাসবুক",
+                    "label_hi": "बैंक पासबुक",
+                    "required": true,
+                    "score_deduction_if_missing": 20
+                }
+            ],
+            "mismatch_checks": [],
+            "bank_conditions": {
+                "account_required": true,
+                "aadhaar_linked_required": true,
+                "dormant_check": true,
+                "dormant_threshold_months": 6,
+                "score_deduction_dormant": 30,
+                "score_deduction_unlinked": 25,
+                "script_code_dormant": "DORMANT_ACCOUNT",
+                "script_code_unlinked": "AADHAAR_UNLINKED"
+            },
+            "cross_scheme_triggers": [],
+            "static_qa": [
+                {
+                    "qa_id": "ssy_eligibility",
+                    "question_variants": [
+                        "samajik suraksha eligibility",
+                        "সামাজিক সুরক্ষা যোগ্যতা",
+                        "কারা সামাজিক সুরক্ষা পাবেন"
+                    ],
+                    "answer": {
+                        "en-IN": "Samajik Suraksha Yojana is for elderly citizens aged 60 and above, widows, and persons with disability who have low income in West Bengal. They receive ₹1,000 per month directly in their bank account.",
+                        "bn-IN": "সামাজিক সুরক্ষা যোজনা পশ্চিমবঙ্গের ৬০ বছর ও তার বেশি বয়সী বয়স্ক নাগরিক, বিধবা এবং কম আয়ের প্রতিবন্ধী ব্যক্তিদের জন্য। তারা সরাসরি ব্যাংক অ্যাকাউন্টে মাসে ₹১,০০০ পাবেন।",
+                        "hi-IN": "सामाजिक सुरक्षा योजना 60 साल से ऊपर के बुजुर्गों, विधवाओं और कम आय के दिव्यांगों के लिए है। उन्हें ₹1,000 प्रति माह सीधे बैंक खाते में मिलता है।"
+                    },
+                    "audio_key": {
+                        "en-IN": "qa/samajik_suraksha/ssy_eligibility_en.ogg",
+                        "bn-IN": "qa/samajik_suraksha/ssy_eligibility_bn.ogg",
+                        "hi-IN": "qa/samajik_suraksha/ssy_eligibility_hi.ogg"
+                    }
+                }
+            ]
+        }
+    ],
+    "scripts": {
+        "NAME_MISMATCH": {
+            "where_en": "Bank Branch or Post Office",
+            "where_bn": "ব্যাংক শাখা বা পোস্ট অফিস",
+            "where_hi": "बैंक शाखा या डाकघर",
+            "form_en": "KYC Name Correction Form",
+            "form_bn": "KYC নাম সংশোধন ফর্ম",
+            "form_hi": "KYC नाम सुधार फॉर्म",
+            "script_en": "Go to the bank counter and say: My name on Aadhaar is [AADHAAR_NAME] but my bank account has [BANK_NAME]. I need to correct the name in my bank account to match my Aadhaar. Please give me the KYC form.",
+            "script_bn": "ব্যাংকের কাউন্টারে গিয়ে বলুন: আমার আধার কার্ডে নাম [AADHAAR_NAME] কিন্তু ব্যাংকে নাম [BANK_NAME]। আমার ব্যাংকের নাম আধারের সাথে মিলিয়ে সংশোধন করতে হবে। KYC ফর্ম দিন।",
+            "script_hi": "बैंक काउंटर पर जाकर कहें: मेरे आधार पर नाम [AADHAAR_NAME] है लेकिन बैंक में [BANK_NAME] है। बैंक का नाम आधार से मिलाना है। KYC फॉर्म दें।",
+            "audio_key": {
+                "bn-IN": "scripts/name_mismatch_bn.ogg",
+                "en-IN": "scripts/name_mismatch_en.ogg",
+                "hi-IN": "scripts/name_mismatch_hi.ogg"
+            }
+        },
+        "DORMANT_ACCOUNT": {
+            "where_en": "Your Bank Branch",
+            "where_bn": "আপনার ব্যাংক শাখা",
+            "where_hi": "आपकी बैंक शाखा",
+            "form_en": "Account Reactivation Request Form",
+            "form_bn": "অ্যাকাউন্ট পুনরায় সক্রিয় করার আবেদন ফর্ম",
+            "form_hi": "खाता पुनः सक्रियण अनुरोध फॉर्म",
+            "script_en": "Go to the bank counter and say: My account has been inactive for more than 6 months. I need to reactivate it for Lakshmir Bhandar DBT. Please help me.",
+            "script_bn": "ব্যাংকের কাউন্টারে গিয়ে বলুন: আমার অ্যাকাউন্ট ৬ মাসের বেশি সময় ধরে নিষ্ক্রিয়। লক্ষ্মীর ভাণ্ডারের DBT পাওয়ার জন্য এটি পুনরায় সক্রিয় করতে হবে। সাহায্য করুন।",
+            "script_hi": "बैंक काउंटर पर जाकर कहें: मेरा खाता 6 महीने से निष्क्रिय है। लक्ष्मीर भंडार DBT के लिए इसे चालू करना है।",
+            "audio_key": {
+                "bn-IN": "scripts/dormant_account_bn.ogg",
+                "en-IN": "scripts/dormant_account_en.ogg",
+                "hi-IN": "scripts/dormant_account_hi.ogg"
+            }
+        },
+        "AADHAAR_UNLINKED": {
+            "where_en": "Your Bank Branch",
+            "where_bn": "আপনার ব্যাংক শাখা",
+            "where_hi": "आपकी बैंक शाखा",
+            "form_en": "Aadhaar Seeding Form",
+            "form_bn": "আধার সিডিং ফর্ম",
+            "form_hi": "आधार सीडिंग फॉर्म",
+            "script_en": "Go to the bank counter and say: My Aadhaar is not linked to my bank account. I need to link it for receiving government benefits. Please give me the Aadhaar seeding form.",
+            "script_bn": "ব্যাংকের কাউন্টারে গিয়ে বলুন: আমার আধার ব্যাংক অ্যাকাউন্টের সাথে লিংক নেই। সরকারি সুবিধা পাওয়ার জন্য লিংক করতে হবে। আধার সিডিং ফর্ম দিন।",
+            "script_hi": "बैंक काउंटर पर कहें: मेरा आधार बैंक खाते से लिंक नहीं है। सरकारी लाभ के लिए लिंक करना है। आधार सीडिंग फॉर्म दें।",
+            "audio_key": {
+                "bn-IN": "scripts/aadhaar_unlinked_bn.ogg",
+                "en-IN": "scripts/aadhaar_unlinked_en.ogg",
+                "hi-IN": "scripts/aadhaar_unlinked_hi.ogg"
+            }
+        },
+        "DOB_MISMATCH": {
+            "where_en": "SDO Office or Panchayat Office",
+            "where_bn": "SDO অফিস বা পঞ্চায়েত অফিস",
+            "where_hi": "SDO कार्यालय या पंचायत कार्यालय",
+            "form_en": "Date of Birth Correction Application",
+            "form_bn": "জন্ম তারিখ সংশোধনের আবেদন",
+            "form_hi": "जन्म तिथि सुधार आवेदन",
+            "script_en": "Go to the SDO office and say: My date of birth on Aadhaar does not match my Birth Certificate. I need a correction letter to apply for the scheme.",
+            "script_bn": "SDO অফিসে গিয়ে বলুন: আমার আধার কার্ডের জন্ম তারিখ জন্ম শংসাপত্রের সাথে মিলছে না। প্রকল্পে আবেদনের জন্য সংশোধনী চিঠি দরকার।",
+            "script_hi": "SDO कार्यालय में कहें: मेरे आधार की जन्म तिथि जन्म प्रमाणपत्र से मेल नहीं खाती। योजना के लिए सुधार पत्र चाहिए।",
+            "audio_key": {
+                "bn-IN": "scripts/dob_mismatch_bn.ogg",
+                "en-IN": "scripts/dob_mismatch_en.ogg",
+                "hi-IN": "scripts/dob_mismatch_hi.ogg"
+            }
+        },
+        "ADDRESS_MISMATCH": {
+            "where_en": "Panchayat Office or Ward Office",
+            "where_bn": "পঞ্চায়েত অফিস বা ওয়ার্ড অফিস",
+            "where_hi": "पंचायत कार्यालय या वार्ड कार्यालय",
+            "form_en": "Residence Proof Update Form",
+            "form_bn": "বাসস্থানের প্রমাণ আপডেট ফর্ম",
+            "form_hi": "निवास प्रमाण अद्यतन फॉर्म",
+            "script_en": "Go to the Panchayat office and say: The address on my documents does not match. I need a residence certificate to clarify my correct address.",
+            "script_bn": "পঞ্চায়েত অফিসে গিয়ে বলুন: আমার কাগজপত্রে ঠিকানা মিলছে না। সঠিক ঠিকানার জন্য বাসস্থান শংসাপত্র দরকার।",
+            "script_hi": "पंचायत कार्यालय में कहें: मेरे दस्तावेजों पर पता नहीं मेल खाता। सही पते के लिए निवास प्रमाणपत्र चाहिए।",
+            "audio_key": {
+                "bn-IN": "scripts/address_mismatch_bn.ogg",
+                "en-IN": "scripts/address_mismatch_en.ogg",
+                "hi-IN": "scripts/address_mismatch_hi.ogg"
+            }
+        }
+    },
+    "greetings": {
+        "bn-IN": {
+            "text": "নমস্কার! আমি WB Digital Sahayak। আপনাকে পশ্চিমবঙ্গের সরকারি প্রকল্প সম্পর্কে সাহায্য করতে পারি। লক্ষ্মীর ভাণ্ডার, স্বাস্থ্যসাথী, কন্যাশ্রী বা অন্য যেকোনো প্রকল্পের বিষয়ে জানতে চাইলে বলুন।",
+            "audio_key": "greetings/welcome_bn.ogg"
+        },
+        "en-IN": {
+            "text": "Hello! I am WB Digital Sahayak. I can help you with West Bengal government schemes like Lakshmir Bhandar, Swasthya Sathi, Kanyashree and more. What would you like to know?",
+            "audio_key": "greetings/welcome_en.ogg"
+        },
+        "hi-IN": {
+            "text": "नमस्ते! मैं WB Digital Sahayak हूं। मैं आपको पश्चिम बंगाल की सरकारी योजनाओं जैसे लक्ष्मीर भंडार, स्वास्थ्य साथी, कन्याश्री के बारे में मदद कर सकता हूं। क्या जानना चाहते हैं?",
+            "audio_key": "greetings/welcome_hi.ogg"
+        }
+    },
+    "common_audio_chunks": [
+        {
+            "chunk": "আধার কার্ড",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/aadhaar_card.ogg"
+        },
+        {
+            "chunk": "ব্যাংক পাসবুক",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/bank_passbook.ogg"
+        },
+        {
+            "chunk": "ভোটার কার্ড",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/voter_card.ogg"
+        },
+        {
+            "chunk": "রেশন কার্ড",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/ration_card.ogg"
+        },
+        {
+            "chunk": "জাতি শংসাপত্র",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/caste_certificate.ogg"
+        },
+        {
+            "chunk": "জন্ম শংসাপত্র",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/birth_certificate.ogg"
+        },
+        {
+            "chunk": "লক্ষ্মীর ভাণ্ডার",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/lakshmir_bhandar.ogg"
+        },
+        {
+            "chunk": "স্বাস্থ্যসাথী",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/swasthya_sathi.ogg"
+        },
+        {
+            "chunk": "কন্যাশ্রী প্রকল্প",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/kanyashree.ogg"
+        },
+        {
+            "chunk": "BDO অফিস",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/bdo_office.ogg"
+        },
+        {
+            "chunk": "আপনি যোগ্য",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/you_are_eligible.ogg"
+        },
+        {
+            "chunk": "আপনি যোগ্য নন",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/you_are_not_eligible.ogg"
+        },
+        {
+            "chunk": "ব্যাংকে যান",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/go_to_bank.ogg"
+        },
+        {
+            "chunk": "আধার কার্ড লিংক করুন",
+            "language": "bn-IN",
+            "audio_key": "chunks/bn/link_aadhaar.ogg"
+        },
+        {
+            "chunk": "Aadhaar Card",
+            "language": "en-IN",
+            "audio_key": "chunks/en/aadhaar_card.ogg"
+        },
+        {
+            "chunk": "Bank Passbook",
+            "language": "en-IN",
+            "audio_key": "chunks/en/bank_passbook.ogg"
+        },
+        {
+            "chunk": "Voter ID",
+            "language": "en-IN",
+            "audio_key": "chunks/en/voter_id.ogg"
+        },
+        {
+            "chunk": "Lakshmir Bhandar",
+            "language": "en-IN",
+            "audio_key": "chunks/en/lakshmir_bhandar.ogg"
+        },
+        {
+            "chunk": "You are eligible",
+            "language": "en-IN",
+            "audio_key": "chunks/en/you_are_eligible.ogg"
+        },
+        {
+            "chunk": "You are not eligible",
+            "language": "en-IN",
+            "audio_key": "chunks/en/you_are_not_eligible.ogg"
+        }
+    ]
+}

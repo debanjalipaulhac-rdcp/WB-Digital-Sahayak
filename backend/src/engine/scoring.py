@@ -1,146 +1,155 @@
 """
 src/engine/scoring.py
-======================
-Readiness Score calculator (0–100).
+Calculates 0-100 application readiness score.
+Pure math. Zero AI. Zero external calls.
 
-Takes a list of issue objects from eligibility.py and returns
-a final weighted score with band classification.
-
-Score bands:
-    80–100  GREEN  "Go to office tomorrow"
-    50–79   AMBER  "Fix issues first, then go"
-    0–49    RED    "Do NOT go yet — you will be rejected"
-
-This file does ONE thing: calculate scores.
-It does not run eligibility checks. It does not know about schemes.
-Feed it issues, get back a score.
+Score breakdown:
+  Eligibility rules  → 50 points  (proportional per rule)
+  Documents present  → 30 points  (proportional per doc)
+  Name mismatch      → 20 points  (0 / 10 / 20 based on match status)
 """
 
-import logging
-from typing import List, Dict, Any
-
-logger = logging.getLogger(__name__)
+from dataclasses import dataclass, field
 
 
-# ── Score Deduction Map ────────────────────────────────────────────────────────
-# Centralised weights. Changing a weight here changes it everywhere.
-# These must match the values in schemes.json — schemes.json is the source of truth
-# for per-scheme weights; this map handles engine-level overrides.
-
-SCORE_BANDS = {
-    "GREEN": {"min": 80, "max": 100, "label": "Go to office tomorrow", "label_bn": "আগামীকাল অফিসে যান"},
-    "AMBER": {"min": 50, "max": 79,  "label": "Fix issues first, then go", "label_bn": "আগে সমস্যা ঠিক করুন, তারপর যান"},
-    "RED":   {"min": 0,  "max": 49,  "label": "Do NOT go yet — follow the roadmap first", "label_bn": "এখনই যাবেন না — আগে roadmap অনুসরণ করুন"},
-}
-
-ISSUE_TYPES = {
-    "INELIGIBLE": "ineligible",    # fails basic eligibility — game over
-    "FATAL":      "fatal",         # critical issue — will be rejected
-    "WARNING":    "warning",       # non-blocking but risks delay
-    "MISSING_DOC": "missing_doc",  # required document not present
-}
+@dataclass
+class ScoreResult:
+    total: int                       # 0-100
+    eligibility_points: int          # max 50
+    document_points: int             # max 30
+    mismatch_points: int             # 0 | 10 | 20
+    missing_documents: list[str]     # doc labels that are False/missing
+    failed_rules: list[str]          # rule descriptions that failed
+    readiness_label: str             # "Ready to Apply" | "Almost Ready" | "Not Ready"
+    breakdown: dict = field(default_factory=dict)  # full detail for API response
 
 
-# ── Band classifier ───────────────────────────────────────────────────────────
-def get_band(score: int) -> str:
-    if score >= 80:
-        return "GREEN"
-    elif score >= 50:
-        return "AMBER"
-    return "RED"
-
-
-def get_band_detail(band: str) -> dict:
-    return SCORE_BANDS.get(band, SCORE_BANDS["RED"])
-
-
-# ── Main scoring function ──────────────────────────────────────────────────────
-def calculate_score(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
+def calculate_score(
+    eligibility_result: dict,
+    documents: dict,
+    mismatch_status: str = "match"
+) -> ScoreResult:
     """
-    Calculate readiness score from a list of issues.
-
-    Args:
-        issues: list of issue dicts, each with at least:
-            {
-              "type": "fatal" | "warning" | "missing_doc" | "ineligible",
-              "code": str,
-              "score_deduction": int,
-              ...
-            }
-
-    Returns:
+    eligibility_result:
         {
-          "score": int,          # 0–100
-          "band": str,           # GREEN | AMBER | RED
-          "band_label": str,     # human-readable verdict
-          "band_label_bn": str,  # Bengali verdict
-          "total_deduction": int,
-          "breakdown": list      # which issues caused which deductions
+          "passed_rules": ["Age: 38 ✓", "Gender: Female ✓"],
+          "failed_rules": ["Income: ₹1.8L exceeds limit ✗"],
+          "required_documents": ["Aadhaar", "Bank Passbook", "Voter ID"]
         }
 
-    Example:
-        issues = [
-            {"type": "fatal", "code": "NAME_MISMATCH", "score_deduction": 35},
-            {"type": "fatal", "code": "DORMANT_ACCOUNT", "score_deduction": 25},
-        ]
-        → score = 40, band = RED
+    documents:
+        { "Aadhaar": True, "Bank Passbook": False, "Voter ID": True }
+        True = user has it, False = missing
+
+    mismatch_status: "match" | "partial" | "mismatch"
+        Comes from mismatch.MismatchResult.status
+
+    Returns ScoreResult with total 0-100.
     """
-    base_score = 100
-    total_deduction = 0
-    breakdown = []
 
-    # If ANY ineligible issue exists — score is 0, game over
-    ineligible_issues = [i for i in issues if i.get("type") == ISSUE_TYPES["INELIGIBLE"]]
-    if ineligible_issues:
-        for issue in ineligible_issues:
-            breakdown.append({
-                "code": issue.get("code"),
-                "type": "ineligible",
-                "deduction": 100,
-                "reason": issue.get("message", "Basic eligibility failed")
-            })
-        logger.info(f"Score: 0 (INELIGIBLE) — {[i['code'] for i in ineligible_issues]}")
-        band = "RED"
-        return {
-            "score": 0,
-            "band": band,
-            "band_label": get_band_detail(band)["label"],
-            "band_label_bn": get_band_detail(band)["label_bn"],
-            "total_deduction": 100,
-            "breakdown": breakdown
+    passed_rules = eligibility_result.get("passed_rules", [])
+    failed_rules = eligibility_result.get("failed_rules", [])
+    required_docs = eligibility_result.get("required_documents", [])
+
+    # ── ELIGIBILITY POINTS (max 50) ───────────────────────────────────────
+    total_rules = len(passed_rules) + len(failed_rules)
+    if total_rules == 0:
+        eligibility_points = 50   # No rules = assume eligible
+    else:
+        eligibility_points = round((len(passed_rules) / total_rules) * 50)
+
+    # ── DOCUMENT POINTS (max 30) ──────────────────────────────────────────
+    missing_documents = []
+    if not required_docs:
+        document_points = 30   # No required docs = full points
+    else:
+        present_count = 0
+        for doc in required_docs:
+            has_doc = documents.get(doc, False)
+            if has_doc:
+                present_count += 1
+            else:
+                missing_documents.append(doc)
+        document_points = round((present_count / len(required_docs)) * 30)
+
+    # ── MISMATCH POINTS (max 20) ──────────────────────────────────────────
+    mismatch_points_map = {
+        "match":    20,
+        "partial":  10,
+        "mismatch": 0
+    }
+    mismatch_points = mismatch_points_map.get(mismatch_status, 0)
+
+    # ── TOTAL ─────────────────────────────────────────────────────────────
+    total = eligibility_points + document_points + mismatch_points
+    # Clamp to 0-100 (defensive)
+    total = max(0, min(100, total))
+
+    readiness_label = get_readiness_label(total)
+
+    breakdown = {
+        "eligibility": {
+            "points": eligibility_points,
+            "max": 50,
+            "passed": len(passed_rules),
+            "failed": len(failed_rules),
+            "total_rules": total_rules
+        },
+        "documents": {
+            "points": document_points,
+            "max": 30,
+            "present": len(required_docs) - len(missing_documents),
+            "missing": len(missing_documents),
+            "total": len(required_docs)
+        },
+        "name_mismatch": {
+            "points": mismatch_points,
+            "max": 20,
+            "status": mismatch_status
         }
+    }
 
-    # Accumulate deductions from all other issue types
-    for issue in issues:
-        issue_type = issue.get("type", "")
-        deduction = issue.get("score_deduction", 0)
-
-        if issue_type == ISSUE_TYPES["INELIGIBLE"]:
-            continue   # handled above
-
-        if deduction > 0:
-            total_deduction += deduction
-            breakdown.append({
-                "code": issue.get("code"),
-                "type": issue_type,
-                "deduction": deduction,
-                "reason": issue.get("message", "")
-            })
-
-    final_score = max(0, base_score - total_deduction)
-    band = get_band(final_score)
-
-    logger.info(
-        f"Score: {final_score}/100 ({band}) | "
-        f"Deductions: {total_deduction} | "
-        f"Issues: {[i.get('code') for i in issues]}"
+    return ScoreResult(
+        total=total,
+        eligibility_points=eligibility_points,
+        document_points=document_points,
+        mismatch_points=mismatch_points,
+        missing_documents=missing_documents,
+        failed_rules=failed_rules,
+        readiness_label=readiness_label,
+        breakdown=breakdown
     )
 
-    return {
-        "score": final_score,
-        "band": band,
-        "band_label": get_band_detail(band)["label"],
-        "band_label_bn": get_band_detail(band)["label_bn"],
-        "total_deduction": total_deduction,
-        "breakdown": breakdown
-    }
+
+def get_readiness_label(score: int) -> str:
+    """
+    80-100 → "Ready to Apply"
+    50-79  → "Almost Ready"
+    0-49   → "Not Ready"
+    """
+    if score >= 80:
+        return "Ready to Apply"
+    elif score >= 50:
+        return "Almost Ready"
+    else:
+        return "Not Ready"
+
+
+def get_readiness_label_bn(score: int) -> str:
+    """Bengali label for WhatsApp responses."""
+    if score >= 80:
+        return "আবেদনের জন্য প্রস্তুত"
+    elif score >= 50:
+        return "প্রায় প্রস্তুত"
+    else:
+        return "এখনই আবেদন করবেন না"
+
+
+def get_readiness_label_hi(score: int) -> str:
+    """Hindi label for WhatsApp responses."""
+    if score >= 80:
+        return "आवेदन के लिए तैयार"
+    elif score >= 50:
+        return "लगभग तैयार"
+    else:
+        return "अभी आवेदन न करें"

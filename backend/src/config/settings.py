@@ -22,8 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # load_dotenv(BASE_DIR / ".env.local", override=True)   # local secrets first
 load_dotenv(BASE_DIR / ".env", override=True)         # fallback defaults
-print(BASE_DIR)
-print(os.getenv("AWS_REGION"))
+
+
 # ── Settings Class ────────────────────────────────────────────────────────────
 class Settings:
 
@@ -38,49 +38,37 @@ class Settings:
     AWS_ACCESS_KEY_ID: str      = os.getenv("AWS_ACCESS_KEY_ID", "")
     AWS_SECRET_ACCESS_KEY: str  = os.getenv("AWS_SECRET_ACCESS_KEY", "")
 
-    # ── DynamoDB ──────────────────────────────────────────────────────────────
-    DYNAMODB_TABLE_NAME: str    = os.getenv("DYNAMODB_TABLE_NAME", "wb-sahayak-users")
-
     # ── S3 ────────────────────────────────────────────────────────────────────
-    S3_BUCKET_NAME: str         = os.getenv("S3_BUCKET_NAME", "wb-sahayak-schemes")
+    S3_BUCKET_NAME:str= os.getenv("S3_BUCKET_NAME", "wb-sahayak-audio")
     S3_AUDIO_CACHE_PREFIX: str  = os.getenv("S3_AUDIO_CACHE_PREFIX", "audio-cache/")
 
-    # ── Amazon Bedrock ────────────────────────────────────────────────────────
-    BEDROCK_MODEL_ID: str       = os.getenv(
-                                    "BEDROCK_MODEL_ID",
-                                    "anthropic.claude-haiku-20240307-v1:0"
-                                  )
-    BEDROCK_KNOWLEDGE_BASE_ID: str = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "")
+    DYNAMO_TABLE_USERS: str = "wb_sahayak_users"
+    DYNAMO_TABLE_SCHEME_QA: str = "wb_sahayak_scheme_qa"
+    DYNAMO_TABLE_AUDIO_CHUNKS: str = "wb_sahayak_audio_chunks"
+    DYNAMO_TABLE_SCHEMES: str = "wb_sahayak_schemes"
+    DYNAMO_TABLE_SESSIONS: str = "wb_sahayak_sessions"
+
+
+    BEDROCK_NOVA_MICRO_MODEL_ID: str = "amazon.nova-micro-v1:0"
+    BEDROCK_NOVA_LITE_MODEL_ID: str = "amazon.nova-lite-v1:0"
+    TITAN_EMBED_MODEL_ID: str = "amazon.titan-embed-text-v2:0"
+
+    VECTOR_CONFIDENCE_THRESHOLD: float = 0.6
 
     # ── Sarvam AI ─────────────────────────────────────────────────────────────
     SARVAM_API_KEY: str         = os.getenv("SARVAM_API_KEY", "")
-    SARVAM_STT_ENDPOINT: str    = os.getenv(
-                                    "SARVAM_STT_ENDPOINT",
-                                    "https://api.sarvam.ai/speech-to-text"
-                                  )
-    SARVAM_TTS_ENDPOINT: str    = os.getenv(
-                                    "SARVAM_TTS_ENDPOINT",
-                                    "https://api.sarvam.ai/text-to-speech"
-                                  )
-    SARVAM_LANGUAGE_CODE: str   = os.getenv("SARVAM_LANGUAGE_CODE", "bn-IN")
 
     # ── Twilio WhatsApp ───────────────────────────────────────────────────────
     TWILIO_ACCOUNT_SID: str     = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN: str      = os.getenv("TWILIO_AUTH_TOKEN", "")
-    TWILIO_WHATSAPP_NUMBER: str = os.getenv(
-                                    "TWILIO_WHATSAPP_NUMBER",
-                                    "whatsapp:+14155238886"
-                                  )
-
+    TWILIO_WHATSAPP_NUMBER: str = os.getenv("TWILIO_WHATSAPP_NUMBER","whatsapp:+14155238886")
+    
     # ── Pinecone ──────────────────────────────────────────────────────────────
     PINECONE_API_KEY: str       = os.getenv("PINECONE_API_KEY", "")
     PINECONE_INDEX_NAME: str    = os.getenv("PINECONE_INDEX_NAME", "wb-sahayak-schemes")
     PINECONE_ENVIRONMENT: str   = os.getenv("PINECONE_ENVIRONMENT", "gcp-starter")
-
-    # ── Paths (engine data files) ─────────────────────────────────────────────
-    SCHEMES_JSON_PATH: str      = str(BASE_DIR / "src" / "engine" / "schemes.json")
-    SCRIPTS_JSON_PATH: str      = str(BASE_DIR / "src" / "engine" / "scripts.json")
-
+    PINECONE_REGION= str        = os.getenv("PINECONE_REGION", "us-east-1")
+    PINECONE_CLOUD= str         = os.getenv("PINECONE_CLOUD", "gcp-starter")
     # ── Validation: called once at startup ───────────────────────────────────
     def validate(self) -> None:
         """

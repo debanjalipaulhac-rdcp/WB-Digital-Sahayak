@@ -1,417 +1,450 @@
 """
-src/storage/dynamo.py
-======================
-All DynamoDB operations for WB Digital Sahayak.
-
-Table Design (single-table pattern):
-  Table name: wb-sahayak-users  (from settings.DYNAMODB_TABLE_NAME)
-
-  Every item has:
-    PK (partition key) = phone number  e.g. "+919876543210"
-    SK (sort key)      = record type   e.g. "PROFILE", "SESSION", "RESULT#<timestamp>"
-
-  This means one table handles everything:
-    Phone "+91..."  + "PROFILE"             → user profile
-    Phone "+91..."  + "SESSION"             → current WhatsApp conversation state
-    Phone "+91..."  + "RESULT#1710000000"   → past eligibility check result
-
-Why single-table:
-  - One table to manage, one set of permissions
-  - All user data together = cheap reads (no joins)
-  - DynamoDB charges per read/write, not per table
-
-Create the table in AWS console:
-  Table name:     wb-sahayak-users
-  Partition key:  phone (String)
-  Sort key:       sk    (String)
-  Billing mode:   On-demand (pay per request — cheapest for hackathon)
-
-Usage:
-    from src.storage.dynamo import save_profile, get_profile, save_session, get_session
+storage/dynamo.py
+DynamoDB CRUD + batch operations for WB Digital Sahayak.
+All table names are pulled from environment settings — never hardcoded here.
 """
 
 import json
-import time
 import logging
-from typing import Any, Dict, Optional
-from boto3.dynamodb.conditions import Key
+import hashlib
+from typing import Optional
+from datetime import datetime, timezone
+
+import boto3
 from botocore.exceptions import ClientError
-
-# from src.config.aws_clients import get_dynamodb_table
-from ..config.aws_clients import get_dynamodb_table
-from src.config.settings import settings
-
+from src.config.aws_clients import get_dynamodb_resource
 logger = logging.getLogger(__name__)
 
-# ── SK (sort key) constants — never hardcode strings elsewhere ────────────────
-SK_PROFILE  = "PROFILE"
-SK_SESSION  = "SESSION"
-SK_RESULT   = "RESULT"     # prefix — full SK is "RESULT#<unix_timestamp>"
+# ─────────────────────────────────────────────
+# TABLE NAMES (set via env vars)
+# ─────────────────────────────────────────────
+import os
+
+TABLE_USERS         = os.getenv("DYNAMO_TABLE_USERS",         "wb_sahayak_users")
+TABLE_SESSIONS      = os.getenv("DYNAMO_TABLE_SESSIONS",      "wb_sahayak_sessions")
+TABLE_SCHEME_QA     = os.getenv("DYNAMO_TABLE_SCHEME_QA",     "wb_sahayak_scheme_qa")
+TABLE_AUDIO_CHUNKS  = os.getenv("DYNAMO_TABLE_AUDIO_CHUNKS",  "wb_sahayak_audio_chunks")
+TABLE_SCHEMES       = os.getenv("DYNAMO_TABLE_SCHEMES",       "wb_sahayak_schemes")
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _get_table():
-    """Get DynamoDB table. Raises RuntimeError if unavailable."""
-    try:
-        return get_dynamodb_table()
-    except Exception as e:
-        raise RuntimeError(f"DynamoDB unavailable: {e}")
+def _get_resource():
+    """Returns DynamoDB resource. Uses env credentials (Lambda role or .env)."""
+    return boto3.resource(
+        "dynamodb",
+        region_name=os.getenv("AWS_REGION", "ap-south-1")
+    )
 
 
-def _now() -> int:
-    """Current Unix timestamp as int."""
-    return int(time.time())
-
-
-def _ttl_days(days: int) -> int:
-    """Unix timestamp N days from now. Used for automatic item expiry."""
-    return _now() + (days * 86400)
-
-
-# ── Profile operations ────────────────────────────────────────────────────────
-
-def save_profile(phone: str, profile_data: Dict[str, Any]) -> bool:
+def _hash_question(question: str) -> str:
     """
-    Save or update a user profile in DynamoDB.
+    Normalize and hash a question string for consistent DynamoDB key lookup.
+    Always lowercase + strip before hashing so variants map to same key.
+    """
+    normalized = question.strip().lower()
+    return hashlib.md5(normalized.encode("utf-8")).hexdigest()
 
-    Args:
-        phone:        User's phone number — the primary key.
-                      e.g. "+919876543210"
-        profile_data: Dict with name, age, gender, caste, district, etc.
 
-    Returns:
-        True if saved, False if error.
+# ═══════════════════════════════════════════════════════════
+# USER TABLE
+# PK: phone_number (string)
+# ═══════════════════════════════════════════════════════════
 
-    DynamoDB item structure:
-        {
-          "phone": "+919876543210",   # PK
-          "sk":    "PROFILE",         # SK
-          "name":  "Sulata Mondal",
-          "age":   38,
-          "gender": "female",
-          "caste":  "sc",
-          "district": "Jalpaiguri",
-          "is_govt_employee": False,
-          "pays_income_tax": False,
-          "has_daughter": True,
-          "has_school_child": False,
-          "created_at": 1710000000,
-          "updated_at": 1710000000,
-          "ttl": 1741536000           # auto-deleted after 1 year
-        }
-
-    Example:
-        success = save_profile("+919876543210", {
-            "name": "Sulata Mondal",
-            "age": 38,
-            "gender": "female",
-            "caste": "sc",
-            "district": "Jalpaiguri",
-        })
+def get_user(phone_number: str) -> Optional[dict]:
+    """
+    Fetch user profile by phone number.
+    Returns None if user does not exist.
     """
     try:
-        table = _get_table()
-        now   = _now()
-        print(table)
-        item = {
-            "phone":      phone,
-            "sk":         SK_PROFILE,
-            "updated_at": now,
-            "ttl":        _ttl_days(365),   # auto-expire after 1 year
-            **profile_data,                 # spread all profile fields in
-        }
-
-        # Set created_at only if first time (don't overwrite on updates)
-        item.setdefault("created_at", now)
-
-        table.put_item(Item=item)
-        logger.info(f"Profile saved: {phone}")
-        return True
-
+        table = _get_resource().Table(TABLE_USERS)
+        resp = table.get_item(Key={"phone_number": phone_number})
+        return resp.get("Item")
     except ClientError as e:
-        logger.error(f"DynamoDB save_profile failed for {phone}: {e}")
-        return False
-
-    except Exception as e:
-        logger.error(f"Unexpected error in save_profile: {e}")
-        return False
-
-
-def get_profile(phone: str) -> Optional[Dict[str, Any]]:
-    """
-    Fetch a user profile by phone number.
-
-    Args:
-        phone: User's phone number e.g. "+919876543210"
-
-    Returns:
-        Profile dict if found, None if not found or error.
-
-    Example:
-        profile = get_profile("+919876543210")
-        if profile:
-            print(profile["name"])  # "Sulata Mondal"
-        else:
-            print("New user — start onboarding flow")
-    """
-    try:
-        table    = _get_table()
-        response = table.get_item(Key={"phone": phone, "sk": SK_PROFILE})
-        item     = response.get("Item")
-
-        if not item:
-            logger.debug(f"No profile found for {phone}")
-            return None
-
-        # Remove DynamoDB-internal fields before returning
-        item.pop("sk", None)
-        item.pop("ttl", None)
-
-        logger.debug(f"Profile fetched: {phone}")
-        return item
-
-    except ClientError as e:
-        logger.error(f"DynamoDB get_profile failed for {phone}: {e}")
-        return None
-
-    except Exception as e:
-        logger.error(f"Unexpected error in get_profile: {e}")
+        logger.error(f"get_user failed for {phone_number}: {e}")
         return None
 
 
-def profile_exists(phone: str) -> bool:
+def save_user(phone_number: str, profile: dict) -> bool:
     """
-    Quick check — does this user have a profile?
-    Cheaper than get_profile (projects only 1 attribute).
-
-    Example:
-        if not profile_exists("+919876543210"):
-            send_onboarding_message(phone)
+    Create or fully overwrite a user profile.
+    profile dict should contain: name, language_code, session_state, etc.
+    Always sets updated_at timestamp.
+    Returns True on success, False on failure.
     """
     try:
-        table    = _get_table()
-        response = table.get_item(
-            Key={"phone": phone, "sk": SK_PROFILE},
-            ProjectionExpression="phone"   # only fetch PK — minimal read cost
-        )
-        return "Item" in response
-
-    except Exception as e:
-        logger.error(f"profile_exists check failed: {e}")
-        return False
-
-
-# ── Session operations (WhatsApp conversation state) ─────────────────────────
-
-def save_session(phone: str, session_data: Dict[str, Any]) -> bool:
-    """
-    Save WhatsApp conversation state for a user.
-
-    Called after every WhatsApp message exchange to track
-    where the user is in the multi-step conversation flow.
-
-    Session states (conversation_step values):
-        "START"              → new conversation
-        "AWAITING_SCHEME"    → asked which scheme, waiting for reply
-        "AWAITING_AGE"       → collecting profile: asked age
-        "AWAITING_GENDER"    → collecting profile: asked gender
-        "AWAITING_DOCS"      → asking which docs they have
-        "AWAITING_NAMES"     → asking for names on each doc
-        "RESULT_SHOWN"       → sent the result, waiting for follow-up
-        "AWAITING_SCRIPT"    → user asked for office script
-
-    Args:
-        phone:        User's phone number
-        session_data: Dict with conversation state
-
-    DynamoDB item structure:
-        {
-          "phone":             "+919876543210",
-          "sk":                "SESSION",
-          "conversation_step": "AWAITING_DOCS",
-          "scheme_id":         "lakshmir_bhandar",
-          "partial_profile":   {"name": "Sulata", "age": 38},
-          "partial_checks":    {"aadhaar_name": "Sulata Mondal"},
-          "last_message":      "আপনার কাছে কোন কোন document আছে?",
-          "updated_at":        1710000000,
-          "ttl":               1710086400   # expires in 24 hours
-        }
-
-    Example:
-        save_session("+919876543210", {
-            "conversation_step": "AWAITING_DOCS",
-            "scheme_id": "lakshmir_bhandar",
-            "partial_profile": {"name": "Sulata", "age": 38},
-        })
-    """
-    try:
-        table = _get_table()
-        item  = {
-            "phone":      phone,
-            "sk":         SK_SESSION,
-            "updated_at": _now(),
-            "ttl":        _ttl_days(1),   # sessions expire after 24 hours
-            **session_data,
-        }
-        table.put_item(Item=item)
-        logger.debug(f"Session saved: {phone} → step={session_data.get('conversation_step')}")
-        return True
-
-    except Exception as e:
-        logger.error(f"save_session failed for {phone}: {e}")
-        return False
-
-
-def get_session(phone: str) -> Optional[Dict[str, Any]]:
-    """
-    Fetch current conversation session for a user.
-
-    Called at the start of every WhatsApp webhook to restore
-    conversation context before processing the new message.
-
-    Returns:
-        Session dict if active, None if expired or not found.
-        None = treat as new conversation, start from "START".
-
-    Example:
-        session = get_session("+919876543210")
-        step = session.get("conversation_step", "START") if session else "START"
-    """
-    try:
-        table    = _get_table()
-        response = table.get_item(Key={"phone": phone, "sk": SK_SESSION})
-        item     = response.get("Item")
-
-        if not item:
-            return None
-
-        item.pop("sk", None)
-        item.pop("ttl", None)
-        return item
-
-    except Exception as e:
-        logger.error(f"get_session failed for {phone}: {e}")
-        return None
-
-
-def clear_session(phone: str) -> bool:
-    """
-    Delete a user's session — resets conversation to START.
-    Called when: user sends "restart", conversation completes,
-    or session gets into an unrecoverable state.
-
-    Example:
-        if user_message.lower() in ("restart", "reset", "শুরু করুন"):
-            clear_session(phone)
-            send_welcome_message(phone)
-    """
-    try:
-        table = _get_table()
-        table.delete_item(Key={"phone": phone, "sk": SK_SESSION})
-        logger.info(f"Session cleared: {phone}")
-        return True
-    except Exception as e:
-        logger.error(f"clear_session failed for {phone}: {e}")
-        return False
-
-
-# ── Eligibility result operations ─────────────────────────────────────────────
-
-def save_result(phone: str, scheme_id: str, result: Dict[str, Any]) -> str:
-    """
-    Save an eligibility check result to DynamoDB.
-    Each result gets a unique SK: "RESULT#<timestamp>"
-
-    Why save results:
-      - User can ask "what was my score?" anytime
-      - Track improvement over time (score went from 42 → 95)
-      - Analytics: which schemes are most checked, avg scores, etc.
-
-    Args:
-        phone:     User's phone number
-        scheme_id: e.g. "lakshmir_bhandar"
-        result:    Full result dict from run_eligibility_check()
-
-    Returns:
-        The SK of the saved result (for reference).
-
-    Example:
-        result_sk = save_result("+919876543210", "lakshmir_bhandar", eligibility_result)
-        print(result_sk)  # "RESULT#1710000000"
-    """
-    try:
-        table     = _get_table()
-        timestamp = _now()
-        sk        = f"{SK_RESULT}#{timestamp}"
-
+        table = _get_resource().Table(TABLE_USERS)
         item = {
-            "phone":     phone,
-            "sk":        sk,
-            "scheme_id": scheme_id,
-            "score":     result.get("score"),
-            "band":      result.get("band"),
-            "issues":    json.dumps(result.get("issues", [])),       # DynamoDB can't store complex nested lists directly
-            "roadmap":   json.dumps(result.get("roadmap", [])),
-            "checked_at": timestamp,
-            "ttl":       _ttl_days(90),   # keep results for 90 days
+            "phone_number": phone_number,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            **profile
         }
-
         table.put_item(Item=item)
-        logger.info(f"Result saved: {phone} | scheme={scheme_id} | score={result.get('score')} | sk={sk}")
-        return sk
-
-    except Exception as e:
-        logger.error(f"save_result failed for {phone}: {e}")
-        return ""
+        return True
+    except ClientError as e:
+        logger.error(f"save_user failed for {phone_number}: {e}")
+        return False
 
 
-def get_latest_result(phone: str, scheme_id: str = None) -> Optional[Dict[str, Any]]:
+def update_user_language(phone_number: str, language_code: str) -> bool:
     """
-    Get the most recent eligibility result for a user.
-
-    Args:
-        phone:     User's phone number
-        scheme_id: Optional filter by scheme. If None, returns latest overall.
-
-    Returns:
-        Result dict with issues and roadmap deserialized, or None.
-
-    Example:
-        result = get_latest_result("+919876543210", "lakshmir_bhandar")
-        if result:
-            print(f"Last score: {result['score']}/100")
+    Update only the language preference for a user.
+    Used when user switches language mid-session.
     """
     try:
-        table = _get_table()
-
-        # Query all RESULT# items for this phone, sorted by SK (which includes timestamp)
-        response = table.query(
-            KeyConditionExpression=Key("phone").eq(phone) & Key("sk").begins_with(SK_RESULT),
-            ScanIndexForward=False,   # newest first
-            Limit=10
+        table = _get_resource().Table(TABLE_USERS)
+        table.update_item(
+            Key={"phone_number": phone_number},
+            UpdateExpression="SET language_code = :lang, updated_at = :ts",
+            ExpressionAttributeValues={
+                ":lang": language_code,
+                ":ts": datetime.now(timezone.utc).isoformat()
+            }
         )
+        return True
+    except ClientError as e:
+        logger.error(f"update_user_language failed: {e}")
+        return False
 
-        items = response.get("Items", [])
 
-        if scheme_id:
-            items = [i for i in items if i.get("scheme_id") == scheme_id]
+def update_session_state(phone_number: str, state: str, context: dict = None) -> bool:
+    """
+    Update WhatsApp conversation state machine state.
+    state: e.g. "START" | "COLLECTING_AGE" | "COLLECTING_CASTE" | "RESULT_SENT"
+    context: arbitrary dict stored alongside state (partial user profile data)
+    """
+    try:
+        table = _get_resource().Table(TABLE_USERS)
+        expr = "SET session_state = :state, updated_at = :ts"
+        vals = {
+            ":state": state,
+            ":ts": datetime.now(timezone.utc).isoformat()
+        }
+        if context:
+            expr += ", session_context = :ctx"
+            vals[":ctx"] = json.dumps(context)
 
-        if not items:
-            return None
+        table.update_item(
+            Key={"phone_number": phone_number},
+            UpdateExpression=expr,
+            ExpressionAttributeValues=vals
+        )
+        return True
+    except ClientError as e:
+        logger.error(f"update_session_state failed: {e}")
+        return False
 
-        item = items[0]   # most recent
 
-        # Deserialize JSON strings back to Python objects
-        if isinstance(item.get("issues"), str):
-            item["issues"] = json.loads(item["issues"])
-        if isinstance(item.get("roadmap"), str):
-            item["roadmap"] = json.loads(item["roadmap"])
+# ═══════════════════════════════════════════════════════════
+# SCHEME QA TABLE
+# PK: question_hash (md5 of normalized question)
+# SK: language_code  (e.g. "bn-IN")
+# ═══════════════════════════════════════════════════════════
 
-        item.pop("sk", None)
-        item.pop("ttl", None)
-        return item
-
-    except Exception as e:
-        logger.error(f"get_latest_result failed for {phone}: {e}")
+def get_qa_by_hash(question_hash: str, language_code: str) -> Optional[dict]:
+    """
+    Lookup a static Q&A answer by pre-computed question hash + language.
+    Returns item with 'answer_text' and 'audio_url' or None if not found.
+    """
+    try:
+        table = _get_resource().Table(TABLE_SCHEME_QA)
+        resp = table.get_item(
+            Key={
+                "question_hash": question_hash,
+                "language_code": language_code
+            }
+        )
+        return resp.get("Item")
+    except ClientError as e:
+        logger.error(f"get_qa_by_hash failed: {e}")
         return None
+
+
+def get_qa(question: str, language_code: str) -> Optional[dict]:
+    """
+    Convenience wrapper: hash the question then lookup.
+    Use this in production code — never hash manually outside this module.
+    """
+    question_hash = _hash_question(question)
+    return get_qa_by_hash(question_hash, language_code)
+
+
+def save_qa(
+    question_variants: list[str],
+    language_code: str,
+    answer_text: str,
+    audio_url: str,
+    scheme_id: str,
+    qa_id: str
+) -> int:
+    """
+    Save a Q&A entry for ALL question variants.
+    Each variant gets its own hash → same answer.
+    Returns number of items written.
+    Used by seed/seed_dynamo.py to populate from schemes.json.
+    """
+    table = _get_resource().Table(TABLE_SCHEME_QA)
+    written = 0
+    for variant in question_variants:
+        try:
+            q_hash = _hash_question(variant)
+            table.put_item(Item={
+                "question_hash": q_hash,
+                "language_code": language_code,
+                "original_question": variant,
+                "answer_text": answer_text,
+                "audio_url": audio_url,
+                "scheme_id": scheme_id,
+                "qa_id": qa_id,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            written += 1
+        except ClientError as e:
+            logger.error(f"save_qa failed for variant '{variant}': {e}")
+    return written
+
+
+# ═══════════════════════════════════════════════════════════
+# AUDIO CHUNKS TABLE  ← Cost savings core
+# PK: chunk_text  (normalized chunk string)
+# SK: language_code
+# ═══════════════════════════════════════════════════════════
+
+def get_audio_chunk(chunk_text: str, language_code: str) -> Optional[str]:
+    """
+    Lookup S3 audio URL for a single text chunk.
+    Returns the S3 URL string, or None on cache miss.
+    """
+    try:
+        table = _get_resource().Table(TABLE_AUDIO_CHUNKS)
+        resp = table.get_item(
+            Key={
+                "chunk_text": chunk_text.strip(),
+                "language_code": language_code
+            }
+        )
+        item = resp.get("Item")
+        return item.get("audio_url") if item else None
+    except ClientError as e:
+        logger.error(f"get_audio_chunk failed: {e}")
+        return None
+
+
+def batch_get_audio_chunks(chunks: list[str], language_code: str) -> dict[str, Optional[str]]:
+    """
+    Batch lookup audio URLs for multiple chunks in ONE DynamoDB call.
+    Returns dict: {chunk_text: audio_url_or_None}
+    Maximum 100 chunks per call (DynamoDB BatchGetItem limit).
+    For >100 chunks, splits automatically into batches.
+
+    This is the KEY cost optimization — 1 DB call instead of N calls.
+    """
+    if not chunks:
+        return {}
+
+    result: dict[str, Optional[str]] = {c: None for c in chunks}
+    resource = _get_resource()
+
+    # DynamoDB batch_get_item max = 100 keys per call
+    batch_size = 100
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+        keys = [
+            {"chunk_text": chunk.strip(), "language_code": language_code}
+            for chunk in batch
+        ]
+        try:
+            resp = resource.batch_get_item(
+                RequestItems={
+                    TABLE_AUDIO_CHUNKS: {"Keys": keys}
+                }
+            )
+            for item in resp.get("Responses", {}).get(TABLE_AUDIO_CHUNKS, []):
+                chunk_text = item["chunk_text"]
+                result[chunk_text] = item.get("audio_url")
+
+            # Handle unprocessed keys (DynamoDB throttle retry)
+            unprocessed = resp.get("UnprocessedKeys", {})
+            if unprocessed:
+                logger.warning(f"batch_get_audio_chunks: {len(unprocessed)} unprocessed keys — retry needed")
+
+        except ClientError as e:
+            logger.error(f"batch_get_audio_chunks failed: {e}")
+
+    return result
+
+
+def save_audio_chunk(chunk_text: str, language_code: str, audio_url: str) -> bool:
+    """
+    Save a single audio chunk URL to DynamoDB cache.
+    Called by background_saver.py AFTER audio is already sent to user.
+    Never blocks the main response path.
+    """
+    try:
+        table = _get_resource().Table(TABLE_AUDIO_CHUNKS)
+        table.put_item(Item={
+            "chunk_text": chunk_text.strip(),
+            "language_code": language_code,
+            "audio_url": audio_url,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        return True
+    except ClientError as e:
+        logger.error(f"save_audio_chunk failed for '{chunk_text}': {e}")
+        return False
+
+
+def batch_save_audio_chunks(chunks_and_urls: list[dict], language_code: str) -> int:
+    """
+    Batch write multiple audio chunks to DynamoDB.
+    chunks_and_urls: [{"chunk_text": "...", "audio_url": "s3://..."}]
+    Returns number of items written.
+    Used by precache_audio.py and background_saver.py.
+    """
+    if not chunks_and_urls:
+        return 0
+
+    table = _get_resource().Table(TABLE_AUDIO_CHUNKS)
+    written = 0
+    now = datetime.now(timezone.utc).isoformat()
+
+    # DynamoDB batch_writer handles batching + retries automatically
+    with table.batch_writer() as batch:
+        for item in chunks_and_urls:
+            try:
+                batch.put_item(Item={
+                    "chunk_text": item["chunk_text"].strip(),
+                    "language_code": language_code,
+                    "audio_url": item["audio_url"],
+                    "created_at": now
+                })
+                written += 1
+            except ClientError as e:
+                logger.error(f"batch_save_audio_chunks item failed: {e}")
+
+    return written
+
+
+# ═══════════════════════════════════════════════════════════
+# SCHEMES TABLE
+# PK: scheme_id
+# ═══════════════════════════════════════════════════════════
+
+def get_scheme(scheme_id: str) -> Optional[dict]:
+    """
+    Get full scheme object from DynamoDB.
+    Returns None if not found.
+    """
+    try:
+        table = _get_resource().Table(TABLE_SCHEMES)
+        resp = table.get_item(Key={"scheme_id": scheme_id})
+        return resp.get("Item")
+    except ClientError as e:
+        logger.error(f"get_scheme failed for {scheme_id}: {e}")
+        return None
+
+
+def get_all_schemes() -> list[dict]:
+    """
+    Scan all schemes from DynamoDB.
+    Only used at startup/seed time. Never call this per-user-request.
+    """
+    try:
+        table = _get_resource().Table(TABLE_SCHEMES)
+        resp = table.scan()
+        return resp.get("Items", [])
+    except ClientError as e:
+        logger.error(f"get_all_schemes failed: {e}")
+        return []
+
+
+def save_scheme(scheme: dict) -> bool:
+    """
+    Save or overwrite a scheme in DynamoDB.
+    Used by seed_dynamo.py.
+    """
+    try:
+        table = _get_resource().Table(TABLE_SCHEMES)
+        table.put_item(Item={
+            **scheme,
+            "seeded_at": datetime.now(timezone.utc).isoformat()
+        })
+        return True
+    except ClientError as e:
+        logger.error(f"save_scheme failed for {scheme.get('scheme_id')}: {e}")
+        return False
+
+
+# ═══════════════════════════════════════════════════════════
+# TABLE CREATION (run once, for dev/setup)
+# ═══════════════════════════════════════════════════════════
+
+def create_tables_if_not_exist():
+    """
+    Creates all required DynamoDB tables if they don't already exist.
+    Safe to call multiple times (checks existence first).
+    Call this from seed/seed_dynamo.py --create-tables flag.
+    """
+    # client = boto3.client("dynamodb", region_name=os.getenv("AWS_REGION", "ap-south-1"))
+    client=get_dynamodb_resource()
+    
+    # existing = {t["TableName"] for t in client.list_tables().get("TableNames", [])}
+
+    tables_to_create = [
+        {
+            "TableName": TABLE_USERS,
+            "KeySchema": [{"AttributeName": "phone_number", "KeyType": "HASH"}],
+            "AttributeDefinitions": [{"AttributeName": "phone_number", "AttributeType": "S"}],
+            "BillingMode": "PAY_PER_REQUEST"
+        },
+        {
+            "TableName": TABLE_SCHEME_QA,
+            "KeySchema": [
+                {"AttributeName": "question_hash", "KeyType": "HASH"},
+                {"AttributeName": "language_code", "KeyType": "RANGE"}
+            ],
+            "AttributeDefinitions": [
+                {"AttributeName": "question_hash", "AttributeType": "S"},
+                {"AttributeName": "language_code", "AttributeType": "S"}
+            ],
+            "BillingMode": "PAY_PER_REQUEST"
+        },
+        {
+            "TableName": TABLE_AUDIO_CHUNKS,
+            "KeySchema": [
+                {"AttributeName": "chunk_text", "KeyType": "HASH"},
+                {"AttributeName": "language_code", "KeyType": "RANGE"}
+            ],
+            "AttributeDefinitions": [
+                {"AttributeName": "chunk_text", "AttributeType": "S"},
+                {"AttributeName": "language_code", "AttributeType": "S"}
+            ],
+            "BillingMode": "PAY_PER_REQUEST"
+        },
+        {
+            "TableName": TABLE_SCHEMES,
+            "KeySchema": [{"AttributeName": "scheme_id", "KeyType": "HASH"}],
+            "AttributeDefinitions": [{"AttributeName": "scheme_id", "AttributeType": "S"}],
+            "BillingMode": "PAY_PER_REQUEST"
+        },
+        {
+            "TableName": TABLE_SESSIONS,
+            "KeySchema": [
+                {"AttributeName": "phone_number", "KeyType": "HASH"},
+                {"AttributeName": "timestamp", "KeyType": "RANGE"}
+            ],
+            "AttributeDefinitions": [
+                {"AttributeName": "phone_number", "AttributeType": "S"},
+                {"AttributeName": "timestamp", "AttributeType": "S"}
+            ],
+            "BillingMode": "PAY_PER_REQUEST"
+        }
+    ]
+
+    for spec in tables_to_create:
+        # if spec["TableName"] in existing:
+        #     logger.info(f"Table already exists: {spec['TableName']}")
+        #     continue
+        try:
+            client.create_table(**spec)
+            logger.info(f"Created table: {spec['TableName']}")
+        except ClientError as e:
+            logger.error(f"Failed to create table {spec['TableName']}: {e}")

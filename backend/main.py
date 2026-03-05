@@ -1,72 +1,63 @@
 """
-WB Digital Sahayak — FastAPI Entry Point
-=========================================
-Root entry point for local dev and AWS Lambda (via Mangum adapter).
+main.py
+=======
+FastAPI application entry point + AWS Lambda handler (via Mangum).
 
-Run locally:
-    uvicorn main:app --reload --port 8000
+Registers all routers. Configures logging.
+Single file — Lambda needs one handler reference.
 
-Deploy to Lambda:
-    Mangum wraps the FastAPI app as a Lambda handler.
-    Lambda handler in infra/template.yaml points to: main.handler
+Usage:
+  Local dev:  uvicorn main:app --reload --port 8000
+  Lambda:     handler = main.handler  (set in Lambda config)
 """
 
+import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
-from src.config.settings import settings
-from src.channels.api import router as api_router
+
 from src.channels.whatsapp import router as whatsapp_router
+from src.channels.api      import router as api_router
 
-settings.validate() 
+# ─────────────────────────────────────────────
+# LOGGING
+# ─────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+logger = logging.getLogger(__name__)
 
-# ── App init ────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# APP
+# ─────────────────────────────────────────────
 app = FastAPI(
     title="WB Digital Sahayak",
-    description="Voice-First Welfare Eligibility Engine for West Bengal",
-    version="1.0.0",
-    docs_url="/docs",       # Swagger UI  → http://localhost:8000/docs
-    redoc_url="/redoc",     # ReDoc UI    → http://localhost:8000/redoc
-    
+    description="Voice-first West Bengal government scheme eligibility engine",
+    version="2.0.0"
 )
 
-# ── CORS (allow React frontend + WhatsApp webhook) ───────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # tighten this in production
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
-# ── Mount routers ────────────────────────────────────────────────────────────
-app.include_router(api_router, prefix="/api/v1", tags=["Core API"])
-# app.include_router(whatsapp_router, prefix="/webhook", tags=["WhatsApp"])  # Level 4
-app.include_router(whatsapp_router,  prefix="",        tags=["WhatsApp"])
+# ─────────────────────────────────────────────
+# ROUTERS
+# ─────────────────────────────────────────────
+app.include_router(whatsapp_router, tags=["WhatsApp"])
+app.include_router(api_router,      tags=["API"], prefix="/api/v1")
 
 
-# ── Health check ─────────────────────────────────────────────────────────────
-@app.get("/", tags=["Health"])
-def root():
-    return {
-        "service": "WB Digital Sahayak",
-        "status": "running",
-        "version": "1.0.0",
-        "docs": "/docs",
-    }
-
-@app.get("/health", tags=["Health"])
+@app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "WB Digital Sahayak"}
 
-# ── Lambda handler (Mangum wraps FastAPI for AWS Lambda) ──────────────────────
-try:
-    from mangum import Mangum
-    lambda_handler = Mangum(app, lifespan="off")
-except ImportError:
-    lambda_handler = None   # local dev — mangum not needed
 
-# ── Local dev entry ────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+# ─────────────────────────────────────────────
+# LAMBDA HANDLER
+# ─────────────────────────────────────────────
+handler = Mangum(app, lifespan="off")
