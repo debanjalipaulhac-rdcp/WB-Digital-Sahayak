@@ -1,0 +1,30 @@
+{
+  "appName": "WB Digital Sahayak",
+  "tagline": "Government of West Bengal",
+  "checkAnother": "Check Another Scheme",
+  "applyNow": "Apply Now",
+  "applyOnline": "Apply Online",
+  "checkEligibility": "Check My Eligibility",
+  "viewAll": "View All",
+  "loading": "Loading...",
+  "error": "Something went wrong",
+  "notFound": "Not found",
+  "back": "Back",
+  "copy": "Copy",
+  "copied": "Copied!",
+  "play": "Play Audio",
+  "whatToSay": "What to Say at Office",
+  "close": "Close",
+  "whereToApply": "Where to Apply",
+  "requiredDocuments": "Required Documents",
+  "eligibilityCriteria": "Eligibility Criteria",
+  "schemeBenefits": "Scheme Benefits",
+  "present": "Present",
+  "missing": "Missing",
+  "warning": "Warning",
+  "languages": {
+    "en": "English",
+    "bn": "বাংলা",
+    "hi": "हिंदी"
+  }
+}

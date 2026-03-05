@@ -1,0 +1,30 @@
+{
+    "appName": "WB ডিজিটাল সহায়ক",
+    "tagline": "পশ্চিমবঙ্গ সরকার",
+    "checkAnother": "অন্য প্রকল্প দেখুন",
+    "applyNow": "এখনই আবেদন করুন",
+    "applyOnline": "অনলাইনে আবেদন করুন",
+    "checkEligibility": "আমার যোগ্যতা পরীক্ষা করুন",
+    "viewAll": "সব দেখুন",
+    "loading": "লোড হচ্ছে...",
+    "error": "কিছু সমস্যা হয়েছে",
+    "notFound": "পাওয়া যায়নি",
+    "back": "পিছনে",
+    "copy": "কপি করুন",
+    "copied": "কপি হয়েছে!",
+    "play": "অডিও চালান",
+    "whatToSay": "অফিসে কী বলবেন",
+    "close": "বন্ধ করুন",
+    "whereToApply": "কোথায় আবেদন করবেন",
+    "requiredDocuments": "প্রয়োজনীয় নথিপত্র",
+    "eligibilityCriteria": "যোগ্যতার মানদণ্ড",
+    "schemeBenefits": "প্রকল্পের সুবিধা",
+    "present": "আছে",
+    "missing": "নেই",
+    "warning": "সতর্কতা",
+    "languages": {
+        "en": "English",
+        "bn": "বাংলা",
+        "hi": "हिंदी"
+    }
+}

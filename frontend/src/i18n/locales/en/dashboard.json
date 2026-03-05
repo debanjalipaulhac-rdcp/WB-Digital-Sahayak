@@ -1,0 +1,23 @@
+{
+    "title": "Eligibility Result",
+    "scoreMeter": "Eligibility Score",
+    "issuesFound": "Issues Found",
+    "schemesQualified": "Schemes You Qualify For",
+    "roadmap": "Your Action Roadmap",
+    "bandGreen": "🟢 You are ready — visit the office tomorrow",
+    "bandAmber": "🟡 Almost ready — fix a few issues first",
+    "bandRed": "🔴 Action needed — important documents missing",
+    "bandGreenSub": "Your application is complete. Visit your nearest BDO office.",
+    "bandAmberSub": "Address the listed issues before applying.",
+    "bandRedSub": "Fix the critical issues below before visiting the office.",
+    "issueType": {
+        "fatal": "Critical Issue",
+        "warning": "Warning"
+    },
+    "actionRequired": "Action Required",
+    "step": "Step",
+    "benefit": "Benefit",
+    "applyAt": "Apply At",
+    "noIssues": "No issues found! You are fully eligible.",
+    "eligibilityScore": "Eligibility Score"
+}

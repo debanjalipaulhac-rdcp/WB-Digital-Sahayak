@@ -1,0 +1,30 @@
+{
+    "appName": "WB डिजिटल सहायक",
+    "tagline": "पश्चिम बंगाल सरकार",
+    "checkAnother": "दूसरी योजना जाँचें",
+    "applyNow": "अभी आवेदन करें",
+    "applyOnline": "ऑनलाइन आवेदन करें",
+    "checkEligibility": "मेरी पात्रता जाँचें",
+    "viewAll": "सब देखें",
+    "loading": "लोड हो रहा है...",
+    "error": "कुछ गलत हुआ",
+    "notFound": "नहीं मिला",
+    "back": "वापस",
+    "copy": "कॉपी करें",
+    "copied": "कॉपी हो गया!",
+    "play": "ऑडियो चलाएं",
+    "whatToSay": "दफ्तर में क्या कहें",
+    "close": "बंद करें",
+    "whereToApply": "कहाँ आवेदन करें",
+    "requiredDocuments": "आवश्यक दस्तावेज़",
+    "eligibilityCriteria": "पात्रता मानदंड",
+    "schemeBenefits": "योजना के लाभ",
+    "present": "उपलब्ध",
+    "missing": "अनुपस्थित",
+    "warning": "चेतावनी",
+    "languages": {
+        "en": "English",
+        "bn": "বাংলা",
+        "hi": "हिंदी"
+    }
+}
