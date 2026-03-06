@@ -1,9 +1,10 @@
 """
 src/voice/audio_assembler.py
-Combines ordered list of S3 audio chunk URLs into a single audio file.
+Downloads .ogg chunks from S3 via boto3, concatenates raw bytes, uploads combined.
 
-Downloads via boto3 (not public HTTP) — avoids S3 403 ACL issues entirely.
-Parallelism via ThreadPoolExecutor (consistent with tts_generator.py).
+OGG streams are byte-concatenable — no re-encoding needed.
+Chunks are already OGG/Vorbis (converted by tts_generator at generation time).
+DO NOT run wav_to_ogg here — chunks are already OGG, not WAV.
 """
 
 import logging
@@ -16,62 +17,47 @@ from src.storage.s3 import upload_audio, get_s3_client
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
-from src.voice.audio_converter import wav_to_ogg
+
 COMBINED_AUDIO_PREFIX = "combined/"
-MAX_WORKERS = 5
+MAX_WORKERS           = 5
 
 
 def _s3_key_from_url(url: str) -> str:
-    """
-    Extract S3 key from a full S3 URL.
-    "https://bucket.s3.region.amazonaws.com/chunks/en_IN/abc123.ogg"
-    → "chunks/en_IN/abc123.ogg"
-    """
-    parsed = urlparse(url)
-    # path starts with "/" — strip it
-    return parsed.path.lstrip("/")
+    return urlparse(url).path.lstrip("/")
 
 
 def _download_one(url: str) -> tuple[str, Optional[bytes]]:
-    """
-    Download a single S3 object via boto3 (authenticated).
-    Returns (url, bytes) or (url, None) on failure.
-    Uses IAM credentials — no public access needed.
-    """
+    """Download one S3 object via boto3 — no public access needed."""
     try:
         key    = _s3_key_from_url(url)
         client = get_s3_client()
         resp   = client.get_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
-        data   = resp["Body"].read()
-        logger.debug(f"Downloaded {len(data)} bytes: {key}")
-        return url, data
+        return url, resp["Body"].read()
     except Exception as e:
         logger.error(f"Failed to download chunk '{url}': {e}")
         return url, None
 
 
 def _make_combined_key(chunk_urls: list[str]) -> str:
-    """Deterministic S3 key — same chunks in same order → same key."""
-    combined = "|".join(chunk_urls)
-    hash_val = hashlib.md5(combined.encode()).hexdigest()[:16]
+    hash_val = hashlib.md5("|".join(chunk_urls).encode()).hexdigest()[:16]
     return f"{COMBINED_AUDIO_PREFIX}{hash_val}.ogg"
 
 
 def assemble_audio(chunk_urls: list[str]) -> Optional[str]:
     """
-    Download all chunks (in parallel via ThreadPoolExecutor),
-    concatenate bytes, upload combined file to S3.
-    Returns single public S3 URL or None on failure.
+    Download .ogg chunks, concatenate bytes, upload combined .ogg.
+
+    IMPORTANT: chunks are already OGG/Vorbis from tts_generator.
+    Raw OGG byte concatenation is valid for the OGG container format.
+    Do NOT call wav_to_ogg here — that corrupts the already-converted audio.
     """
     if not chunk_urls:
-        logger.error("assemble_audio called with empty chunk_urls list")
+        logger.error("assemble_audio: empty chunk_urls")
         return None
 
-    # Single chunk — return directly
+    # Single chunk — return directly, no assembly needed
     if len(chunk_urls) == 1:
         return chunk_urls[0]
-
-    combined_key = _make_combined_key(chunk_urls)
 
     # Download all in parallel
     url_to_bytes: dict[str, Optional[bytes]] = {}
@@ -81,9 +67,9 @@ def assemble_audio(chunk_urls: list[str]) -> Optional[str]:
             url, data = future.result()
             url_to_bytes[url] = data
 
-    # Preserve original order when assembling
+    # Preserve original order
     ordered_bytes = []
-    failed = []
+    failed        = []
     for url in chunk_urls:
         data = url_to_bytes.get(url)
         if data:
@@ -92,25 +78,24 @@ def assemble_audio(chunk_urls: list[str]) -> Optional[str]:
             failed.append(url)
 
     if failed:
-        logger.warning(
-            f"assemble_audio: {len(failed)}/{len(chunk_urls)} chunks failed — "
-            f"assembling partial audio"
-        )
+        logger.warning(f"assemble_audio: {len(failed)}/{len(chunk_urls)} chunks failed")
 
     if not ordered_bytes:
-        logger.error("All chunks failed to download — cannot assemble audio")
+        logger.error("assemble_audio: all chunks failed — cannot assemble")
         return None
 
-    combined_bytes = b"".join(ordered_bytes)
-    audio=wav_to_ogg(combined_bytes)
-    url = upload_audio(audio, combined_key)
+    # Concatenate raw OGG bytes — valid for OGG container format
+    combined = b"".join(ordered_bytes)
+
+    combined_key = _make_combined_key(chunk_urls)
+    url = upload_audio(combined, combined_key)
 
     if url:
         logger.info(
-            f"Combined audio assembled: {len(chunk_urls)} chunks "
-            f"({len(combined_bytes)} bytes) → {combined_key}"
+            f"assemble_audio: {len(chunk_urls)} chunks → "
+            f"{len(combined):,}B → {combined_key}"
         )
     else:
-        logger.error("Failed to upload combined audio to S3")
+        logger.error("assemble_audio: S3 upload failed")
 
     return url

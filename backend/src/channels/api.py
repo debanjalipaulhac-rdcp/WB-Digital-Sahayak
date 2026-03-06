@@ -319,3 +319,4 @@ def check_mismatch_endpoint(req: MismatchRequest):
                 "files": [{"key": k, "text_preview": v.get("text","")[:60]} for k,v in AUDIO_CACHE_MANIFEST.items()]}
     except Exception as e:
         return {"error": str(e), "total_files": 0}
+    

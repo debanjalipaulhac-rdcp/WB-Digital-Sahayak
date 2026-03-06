@@ -36,7 +36,7 @@ from fastapi.responses import PlainTextResponse
 from src.voice.stt                  import transcribe_audio, STTResult
 from src.engine.scoring             import calculate_score, get_readiness_label_bn
 from src.storage.dynamo             import get_user, save_user, update_session_state
-from src.engine.mismatch            import check_name_mismatch,generate_mismatch_script
+# from src.engine.mismatch            import check_name_mismatch,generate_mismatch_script
 from src.cache.audio_cache          import resolve_chunks, fill_misses
 from src.router.guardrails          import validate_input
 from src.engine.eligibility         import check_eligibility, get_all_eligible_schemes

@@ -6,13 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "open-next:build": "open-next build",
+    "open-next:start": "open-next start"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
+    "aws-cdk-lib": "^2.241.0",
     "axios": "^1.13.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "constructs": "^10.5.1",
     "framer-motion": "^12.35.0",
     "i18next": "^25.8.14",
     "lucide-react": "^0.577.0",
@@ -20,7 +23,9 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-i18next": "^16.5.5",
-    "tailwind-merge": "^3.5.0"
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -30,7 +35,8 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
+    "open-next": "^3.1.3",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5"
   }
 }

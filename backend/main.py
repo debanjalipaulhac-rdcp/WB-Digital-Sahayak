@@ -18,7 +18,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 from src.channels.whatsapp import router as whatsapp_router
-from src.channels.api      import router as api_router
+from src.channels.auth_controller    import router as auth_router
+from src.channels.schemes_controller import router as schemes_router
+from src.channels.profile_controller import router as profile_router
+
 
 # ─────────────────────────────────────────────
 # LOGGING
@@ -41,16 +44,20 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
+
 )
 
 # ─────────────────────────────────────────────
 # ROUTERS
 # ─────────────────────────────────────────────
 app.include_router(whatsapp_router, tags=["WhatsApp"])
-app.include_router(api_router,      tags=["API"], prefix="/api/v1")
-
+# app.include_router(api_router,      tags=["API"], prefix="/api/v1")
+app.include_router(auth_router,    prefix="/api/v1")
+app.include_router(schemes_router, prefix="/api/v1")
+app.include_router(profile_router, prefix="/api/v1")
 
 @app.get("/health")
 def health():

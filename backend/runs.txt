@@ -1,0 +1,80 @@
+aws secretsmanager create-secret `--name sahayak/secrets `-region ap-south-1 --secret-string '{ "SARVAM_API_KEY": "your_actual_key", "TWILIO_ACCOUNT_SID": "your_actual_sid", "TWILIO_AUTH_TOKEN": "your_actual_token", "PINECONE_API_KEY": "your_actual_key" }'
+
+//update
+
+aws secretsmanager update-secret `
+  --secret-id sahayak/secrets `
+  --region ap-south-1 `
+  --secret-string '{
+    "SARVAM_API_KEY": "new_key_here",
+    "TWILIO_ACCOUNT_SID": "new_sid",
+    "TWILIO_AUTH_TOKEN": "new_token",
+    "PINECONE_API_KEY": "new_key"
+  }'
+
+
+  sam build
+
+
+  sam deploy --guided
+
+Configuring SAM deploy
+======================
+
+        Looking for config file [samconfig.toml] :  Not found
+
+        Setting default arguments for 'sam deploy'
+        =========================================
+        Stack Name [sam-app]: wb-digital-sahayak
+        AWS Region [ap-south-1]: ap-south-1
+        #Shows you resources changes to be deployed and require a 'Y' to initiate deploy
+        Confirm changes before deploy [y/N]: y
+        #SAM needs permission to be able to create roles to connect to the resources in your template
+        Allow SAM CLI IAM role creation [Y/n]: y
+        #Preserves the state of previously provisioned resources when an operation fails
+        Disable rollback [y/N]: N
+        BackendFunction has no authentication. Is this okay? [y/N]: y
+        BackendFunction has no authentication. Is this okay? [y/N]: y
+        Save arguments to configuration file [Y/n]: y
+        SAM configuration file [samconfig.toml]: 
+        SAM configuration environment [default]: 
+
+
+
+        Uploading to wb-digital-sahayak/e41a1698af092bb8718a25d9e2b770f0.template  2839 / 2839  (100.00%)
+
+
+Waiting for changeset to be created..
+
+
+
+CloudFormation stack changeset
+-------------------------------------------------------------------------------------------------
+Operation                LogicalResourceId        ResourceType             Replacement
+-------------------------------------------------------------------------------------------------
++ Add                    BackendFunctionApiProx   AWS::Lambda::Permissio   N/A     
+
+                         yPermission              n                                
+
++ Add                    BackendFunctionApiRoot   AWS::Lambda::Permissio   N/A     
+
+                         Permission               n                                
+
++ Add                    BackendFunctionRole      AWS::IAM::Role           N/A     
+
++ Add                    BackendFunction          AWS::Lambda::Function    N/A     
+
++ Add                    ServerlessHttpApiApiGa   AWS::ApiGatewayV2::Sta   N/A     
+
+                         tewayDefaultStage        ge                               
+
++ Add                    ServerlessHttpApi        AWS::ApiGatewayV2::Api   N/A     
+
+-------------------------------------------------------------------------------------------------
+
+
+Changeset created successfully. arn:aws:cloudformation:ap-south-1:445567096027:changeSet/samcli-deploy1772837256/71542a18-a4d6-42d7-8a11-235a8d3d14c7
+
+
+Previewing CloudFormation changeset before deployment
+======================================================

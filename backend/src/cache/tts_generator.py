@@ -1,153 +1,127 @@
 """
 src/cache/tts_generator.py
-Generates TTS audio for cache-miss chunks ONLY.
-Never called for chunks already in S3/DynamoDB.
-Runs in parallel for multiple misses using asyncio.
+Generates TTS for cache-miss chunks via Sarvam SDK.
+
+Uses ThreadPoolExecutor — NOT asyncio.
+Reason: this runs inside a daemon thread (started by whatsapp.py).
+asyncio.run() inside a thread causes RuntimeError on Windows and
+unpredictable behavior on Lambda. ThreadPoolExecutor is safe anywhere.
+
+Flow per chunk:
+  Sarvam SDK → WAV bytes (b'RIFF') → wav_to_ogg() → OGG/Vorbis → S3
 """
 
-import os
-import asyncio
 import base64
+import hashlib
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
-import aiohttp
-
-from src.storage.s3 import upload_audio, get_audio_url
+from src.storage.s3 import upload_audio
+from src.voice.audio_converter import wav_to_ogg
 
 logger = logging.getLogger(__name__)
 
-SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
-SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
+CHUNK_S3_PREFIX = "chunks/"
+AUDIO_EXT       = ".ogg"
+CONTENT_TYPE    = "audio/ogg"
+MAX_WORKERS     = 5   # stay under Sarvam rate limit
 
 VOICE_MAP = {
-    "bn-IN": "kavitha",   # Bengali female voice
-    "hi-IN": "suhani",     # Hindi female voice
-    "en-IN": "shruti"       # English Indian accent
+    "bn-IN": "kavitha",
+    "hi-IN": "suhani",
+    "en-IN": "shruti"
 }
 
-CHUNK_S3_PREFIX = "chunks/"
-from src.voice.audio_converter import wav_to_ogg
 
 def _chunk_s3_key(chunk_text: str, language_code: str) -> str:
-    import hashlib
     chunk_hash = hashlib.md5(chunk_text.encode("utf-8")).hexdigest()[:8]
     lang_short = language_code.replace("-", "_")
-    return f"{CHUNK_S3_PREFIX}{lang_short}/{chunk_hash}.ogg"
+    return f"{CHUNK_S3_PREFIX}{lang_short}/{chunk_hash}{AUDIO_EXT}"
 
-from src.config.sarvam_client import get_sarvam_client
 
-async def _generate_single(
-    session: aiohttp.ClientSession,
-    chunk_text: str,
-    language_code: str
-) -> tuple[str, Optional[bytes]]:
+def _generate_single(chunk_text: str, language_code: str) -> tuple[str, Optional[bytes]]:
     """
-    Generate TTS for one chunk. Returns (chunk_text, audio_bytes or None).
+    Generate TTS for one chunk. Runs in ThreadPoolExecutor worker.
+    Returns (chunk_text, ogg_bytes) or (chunk_text, None) on any failure.
     """
-    client =get_sarvam_client()
     try:
-        VOICE_MAP = {
-            "bn-IN": "kavitha",   # Bengali female voice
-            "hi-IN": "suhani",     # Hindi female voice
-            "en-IN": "shruti"       # English Indian accent
-        }
-        voice = VOICE_MAP.get(language_code, "maya")
+        from src.config.sarvam_client import get_sarvam_client
+
+        client = get_sarvam_client()
+        voice  = VOICE_MAP.get(language_code, "maya")
+
         response = client.text_to_speech.convert(
-                        text=chunk_text,
-                        model="bulbul:v3",
-                        target_language_code=language_code,
-                        speaker=voice,
-                        speech_sample_rate=16000,
-                        pace=1.2
-                    )
-        combined_audio = "".join(response.audios)
-        wav_bytes =base64.b64decode(combined_audio) if isinstance(combined_audio, str) else combined_audio
+            text=chunk_text,
+            model="bulbul:v3",
+            target_language_code=language_code,
+            speaker=voice,
+            speech_sample_rate=16000,
+            pace=1.2
+        )
+
+        # SDK returns list of base64 strings or raw bytes — handle both
+        raw = response.audios[0] if response.audios else None
+        if raw is None:
+            logger.error(f"Sarvam returned empty audio for '{chunk_text[:40]}'")
+            return chunk_text, None
+
+        wav_bytes = base64.b64decode(raw) if isinstance(raw, str) else raw
+
+        # Convert WAV → OGG/Vorbis for WhatsApp
         ogg_bytes = wav_to_ogg(wav_bytes)
         if not ogg_bytes:
-            logger.warning(f"OGG conversion failed for '{chunk_text[:40]}' - using WAV fallback")
-            return chunk_text, combined_audio
-        
-        # b64_file = base64.b64decode(combined_audio)
+            logger.warning(f"wav_to_ogg failed for '{chunk_text[:40]}' — skipping")
+            return chunk_text, None
+
         return chunk_text, ogg_bytes
 
-    except asyncio.TimeoutError:
-        logger.error(f"TTS timeout for chunk: '{chunk_text[:40]}'")
-        return chunk_text, None
-    except aiohttp.ClientError as e:
-        logger.error(f"TTS request failed for '{chunk_text[:40]}': {e}")
-        return chunk_text, None
-    except (KeyError, IndexError) as e:
-        logger.error(f"TTS unexpected response for '{chunk_text[:40]}': {e}")
+    except Exception as e:
+        logger.error(f"_generate_single failed for '{chunk_text[:40]}': {e}")
         return chunk_text, None
 
 
-async def _generate_all_async(
-    miss_chunks: list[str],
-    language_code: str
-) -> dict[str, Optional[bytes]]:
-    """Generate TTS for all miss chunks in parallel."""
-    async with aiohttp.ClientSession() as session:
-        tasks = [
-            _generate_single(session, chunk, language_code)
-            for chunk in miss_chunks
-        ]
-        results = await asyncio.gather(*tasks)
-    return dict(results)
-
-
-def generate_for_misses(
-    miss_chunks: list[str],
-    language_code: str
-) -> dict[str, str]:
+def generate_for_misses(miss_chunks: list[str], language_code: str) -> dict[str, str]:
     """
-    Generate TTS audio for all cache-miss chunks.
-    Runs all TTS calls in parallel.
-    Uploads to S3 immediately so URLs are available for assembly.
-    Background saving to DynamoDB is handled by background_saver.py separately.
+    Generate TTS + convert + upload for all cache-miss chunks.
+    Returns {chunk_text: s3_url} for successful chunks only.
 
-    Returns: {normalized_chunk_text: s3_url}
-    Only includes chunks that generated successfully.
+    Sets generate_for_misses._last_generated so whatsapp.py can
+    pass it to save_new_chunks_async without circular imports.
     """
     if not miss_chunks:
         return {}
 
-    logger.info(f"Generating TTS for {len(miss_chunks)} cache misses [{language_code}]")
+    logger.info(f"TTS: generating {len(miss_chunks)} misses [{language_code}]")
 
-    # Run all TTS calls in parallel
-    try:
-        audio_map = asyncio.run(_generate_all_async(miss_chunks, language_code))
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        audio_map = loop.run_until_complete(
-            _generate_all_async(miss_chunks, language_code)
-        )
+    result:        dict[str, str] = {}
+    to_save_later: list[dict]     = []
 
-    # Upload to S3 — must happen before assembly
-    result: dict[str, str] = {}
-    to_save_later: list[dict] = []   # handed to background_saver
+    # ThreadPoolExecutor — safe inside daemon threads, no event loop issues
+    with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(miss_chunks))) as pool:
+        futures = {
+            pool.submit(_generate_single, chunk, language_code): chunk
+            for chunk in miss_chunks
+        }
+        for future in as_completed(futures):
+            chunk_text, ogg_bytes = future.result()
 
-    for chunk_text, audio_bytes in audio_map.items():
-        if audio_bytes is None:
-            logger.warning(f"TTS failed for chunk: '{chunk_text[:40]}'")
-            continue
+            if ogg_bytes is None:
+                logger.warning(f"  SKIP (TTS failed): '{chunk_text[:40]}'")
+                continue
 
-        s3_key = _chunk_s3_key(chunk_text, language_code)
-        url = upload_audio(audio_bytes, s3_key)
+            s3_key = _chunk_s3_key(chunk_text, language_code)
+            url    = upload_audio(ogg_bytes, s3_key)
 
-        if url:
-            result[chunk_text] = url
-            to_save_later.append({"chunk_text": chunk_text, "audio_url": url})
-            logger.info(f"  ✅ Generated+uploaded: '{chunk_text[:40]}'")
-        else:
-            logger.error(f"  ❌ S3 upload failed for: '{chunk_text[:40]}'")
+            if url:
+                result[chunk_text] = url
+                to_save_later.append({"chunk_text": chunk_text, "audio_url": url})
+                logger.info(f"  OK: '{chunk_text[:40]}' → {s3_key}")
+            else:
+                logger.error(f"  S3 FAIL: '{chunk_text[:40]}'")
 
-    # Attach to_save_later as attribute so caller can pass to background_saver
-    # without creating a circular import
+    # Attach for whatsapp.py to pick up and pass to background_saver
     generate_for_misses._last_generated = to_save_later
 
-    logger.info(
-        f"TTS generation complete: {len(result)}/{len(miss_chunks)} succeeded"
-    )
+    logger.info(f"TTS done: {len(result)}/{len(miss_chunks)} succeeded")
     return result

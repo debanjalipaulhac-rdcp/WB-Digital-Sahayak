@@ -1,0 +1,97 @@
+name: Deploy to AWS Lambda
+
+on:
+  push:
+    branches: [main]  # triggers ONLY on main push
+
+env:
+  AWS_REGION: ap-south-1  # Mumbai — use this for India projects
+
+jobs:
+  # ── Test ─────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test Backend
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pytest tests/ -v
+
+      - name: Test Frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run lint
+          npm run type-check
+
+  # ── Deploy Backend (FastAPI) ──────────────────────────────────
+  deploy-backend:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Backend with SAM
+        run: |
+          cd backend
+          pip install aws-sam-cli
+          sam build
+          sam deploy \
+            --stack-name wb-digital-sahayak-backend \
+            --s3-bucket ${{ secrets.SAM_DEPLOY_BUCKET }} \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --parameter-overrides \
+              Environment=production \
+              OpenAIKey=${{ secrets.OPENAI_API_KEY }}
+
+  # ── Deploy Frontend (Next.js) ─────────────────────────────────
+  deploy-frontend:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.20.0'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build Next.js + OpenNext
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          npx open-next build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
+
+      - name: Deploy with CDK
+        run: |
+          cd infra
+          npm ci
+          npx cdk deploy --require-approval never
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_ID }} \
+            --paths "/*"

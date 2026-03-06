@@ -74,8 +74,7 @@ def call_sarvam_tts(text: str, language_code: str) -> bytes | None:
             model="bulbul:v3",
             target_language_code=language_code, 
             speaker=voice, 
-            # output_format="opus",
-            pace=1.1,
+            pace=1.2,
             speech_sample_rate=16000
             )
 

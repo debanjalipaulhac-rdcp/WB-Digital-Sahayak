@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: WB Digital Sahayak Backend
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.13
+    Environment:
+      Variables:
+        AWS_REGION_NAME: ap-south-1
+        DYNAMO_TABLE_USERS: wb_sahayak_users
+        DYNAMO_TABLE_SCHEME_QA: wb_sahayak_scheme_qa
+        DYNAMO_TABLE_AUDIO_CHUNKS: wb_sahayak_audio_chunks
+        DYNAMO_TABLE_SCHEMES: wb_sahayak_schemes
+        DYNAMO_TABLE_SESSIONS: wb_sahayak_sessions
+        S3_BUCKET_NAME: wb-sahayak-schemes
+        BEDROCK_NOVA_MICRO_MODEL_ID: amazon.nova-micro-v1:0
+        BEDROCK_NOVA_LITE_MODEL_ID: amazon.nova-lite-v1:0
+        TITAN_EMBED_MODEL_ID: amazon.titan-embed-text-v2:0
+        VECTOR_CONFIDENCE_THRESHOLD: "0.7"
+        MOCK_MODE: "true"
+        CACHE_TTS: "true"
+        PINECONE_REGION: ap-south-1
+        PINECONE_CLOUD: aws
+
+Resources:
+
+  BackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: main.handler
+      Layers:
+        - arn:aws:lambda:ap-south-1:445567096027:layer:ffmpeg_layer:1
+      Environment:
+        Variables:
+          SARVAM_API_KEY: "{{resolve:secretsmanager:sahayak/secrets:SecretString:SARVAM_API_KEY}}"
+          TWILIO_ACCOUNT_SID: "{{resolve:secretsmanager:sahayak/secrets:SecretString:TWILIO_ACCOUNT_SID}}"
+          TWILIO_AUTH_TOKEN: "{{resolve:secretsmanager:sahayak/secrets:SecretString:TWILIO_AUTH_TOKEN}}"
+          PINECONE_API_KEY: "{{resolve:secretsmanager:sahayak/secrets:SecretString:PINECONE_API_KEY}}"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: wb_sahayak_users
+        - DynamoDBCrudPolicy:
+            TableName: wb_sahayak_sessions
+        - DynamoDBCrudPolicy:
+            TableName: wb_sahayak_schemes
+        - DynamoDBCrudPolicy:
+            TableName: wb_sahayak_scheme_qa
+        - DynamoDBCrudPolicy:
+            TableName: wb_sahayak_audio_chunks
+        - S3CrudPolicy:
+            BucketName: wb-sahayak-schemes
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - secretsmanager:GetSecretValue
+              Resource: "*"
+      Events:
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway URL - save this"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
