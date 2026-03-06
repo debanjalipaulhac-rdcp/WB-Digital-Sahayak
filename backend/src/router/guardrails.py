@@ -61,7 +61,7 @@ def validate_input(text: str) -> GuardrailResult:
         return GuardrailResult(
             valid=False,
             reason="out_of_scope",
-            response="I only help with West Bengal government schemes. Please ask about schemes like Lakshmir Bhandar, Swasthya Sathi, Kanyashree, etc."
+            response=f"Sorry i can't help with your query.\n Your Query: {text}\n I only help with West Bengal government schemes. Please ask about schemes like Lakshmir Bhandar, Swasthya Sathi, Kanyashree, etc."
         )
 
     return GuardrailResult(

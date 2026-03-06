@@ -12,34 +12,46 @@ import boto3
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
-
+from src.config.aws_clients import get_bedrock_nova_client
 
 SYSTEM_PROMPT = """You are a keyword extractor for a West Bengal government scheme chatbot.
-Your job: take a user query (may be Bengali, Hindi, English or mixed) and extract
-clean English keywords for searching a scheme database.
+Input is always English — translated from Bengali/Hindi by STT before reaching you.
+Your job: extract clean English keywords for searching a scheme database.
 
 Output ONLY a JSON object: {"keywords": "extracted english keywords here"}
 No explanations. No other text. Just the JSON.
 
 Rules:
-- Translate key concepts to English
-- Keep scheme names (Lakshmir Bhandar, Kanyashree, etc.)
-- Focus on: scheme name, document type, eligibility criteria, benefit type
+- Input is always English — no translation needed
+- Keep scheme names exactly (Lakshmir Bhandar, Kanyashree, Swasthya Sathi, Yuva Sathi, Rupashree, Samajik Suraksha)
+- Focus on: scheme name, document type, eligibility criteria, benefit type, application process
+- Remove filler words (I want to know, tell me, what is, please, hello)
 - Max 10 words in keywords
-- If query is a greeting or out of scope, return {"keywords": ""}"""
+- If query is a greeting or completely out of scope, return {"keywords": ""}"""
 
+# All examples use English — STT mode="translate" converts everything before this point
 EXAMPLES = [
-    {"role": "user",      "content": "লক্ষ্মীর ভাণ্ডারের জন্য কী কী কাগজ লাগে"},
-    {"role": "assistant", "content": '{"keywords": "Lakshmir Bhandar documents required"}'},
-    {"role": "user",      "content": "kanyashree scheme k liye kaun eligible hai"},
-    {"role": "assistant", "content": '{"keywords": "Kanyashree eligibility criteria girl student"}'},
-    {"role": "user",      "content": "স্বাস্থ্যসাথীতে কত টাকা পাওয়া যায়"},
-    {"role": "assistant", "content": '{"keywords": "Swasthya Sathi benefit amount health coverage"}'},
-    {"role": "user",      "content": "my age is 30 female sc caste what scheme can i get"},
-    {"role": "assistant", "content": '{"keywords": "eligible schemes female age 30 SC caste"}'},
+    {"role": "user",      "content": [{"text":  "what documents are needed for lakshmir bhandar"}]},
+    {"role": "assistant", "content": [{"text": '{"keywords": "Lakshmir Bhandar documents required"}'}]},
+    {"role": "user",      "content": [{"text": "I want to know about yuva sathi scheme"}]},
+    {"role": "assistant", "content": [{"text": '{"keywords": "Yuva Sathi eligibility benefit"}'}]},
+    {"role": "user",      "content": [{"text": "how much money do you get from swasthya sathi"}]},
+    {"role": "assistant", "content": [{"text": '{"keywords": "Swasthya Sathi benefit amount coverage"}'}]},
+    {"role": "user",      "content": [{"text": "I am 30 years old female SC caste what scheme can I get"}]},
+    {"role": "assistant", "content": [{"text": '{"keywords": "eligible schemes female age 30 SC caste"}'}]},
+
+    {"role": "user",      "content": [{"text": "where do I apply for kanyashree"}]},
+
+    {"role": "assistant", "content": [{"text":'{"keywords": "Kanyashree application office how to apply"}'}]},
+
+    {"role": "user",      "content": [{"text": "hello"}]},
+    {"role": "assistant", "content": [{"text": '{"keywords": ""}'}]},
+    {"role": "user",      "content": [{"text": "rupashree marriage grant documents and eligibility"}]},
+    {"role": "assistant", "content": [{"text": '{"keywords": "Rupashree marriage grant eligibility documents"}'}]},
 ]
 
-from src.config.aws_clients import get_bedrock_nova_client
+
+
 
 
 def extract_keywords(user_query: str) -> str:
@@ -57,35 +69,42 @@ def extract_keywords(user_query: str) -> str:
         return ""
 
     try:
-        client = get_bedrock_nova_client()
+        # client = _get_client()
 
         # Build messages with few-shot examples for better extraction
-        messages = EXAMPLES + [
+        body = EXAMPLES + [
             {
                 "role": "user", 
-                "content":[{"text": user_query.strip()}]
+                "content": [{"text":user_query.strip()}]
             }
         ]
 
-
+        # body = json.dumps({
+        #     "messages": messages,
+        #     "system": [{"text": SYSTEM_PROMPT}],
+        #     "inferenceConfig": {
+        #         "maxTokens": 50,      # Keywords are short
+        #         "temperature": 0.0,   # Deterministic extraction
+        #         "topP": 1.0
+        #     }
+        # })
+        client = get_bedrock_nova_client() 
         response = client.converse(
             modelId=settings.BEDROCK_NOVA_MICRO_MODEL_ID,
-            messages=messages,
-            system=[{"text":SYSTEM_PROMPT}],
-            inferenceConfig= {
-                "maxTokens": 256,      # Keywords are short
-                "temperature": 0.0,   # Deterministic extraction
-                "topP": 1.0
-            }
+            messages = body,
+            system = [{"text": SYSTEM_PROMPT}],
+            inferenceConfig={
+            "maxTokens": 256, 
+            "temperature": 0.0,
+        }
         )
-
-        result = response["output"]["message"]["content"][0]["text"].strip()
-        print("🤖 BEDROCK_NOVA_MICRO_MODEL_ID -> ",result)
-
-    
-
-        # Parse JSON response
-        parsed = json.loads(result)
+        print(response["output"]["message"]["content"][0]["text"])
+        # return None
+        # result = json.loads(response["output"]["message"]["content"][0]["text"])
+        # raw_text = result["output"]["message"]["content"][0]["text"].strip()
+        
+        # # Parse JSON response
+        parsed = json.loads(response["output"]["message"]["content"][0]["text"])
         keywords = parsed.get("keywords", "").strip()
 
         logger.info(f"Keywords extracted: '{user_query[:40]}' → '{keywords}'")

@@ -14,12 +14,6 @@ import requests
 import io
 logger = logging.getLogger(__name__)
 from .transcript_normalizer import normalize_transcript
-SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
-SARVAM_STT_URL = "https://api.sarvam.ai/speech-to-text"
-
-# Languages Sarvam STT can detect and return
-SUPPORTED_LANGUAGES = {"bn-IN", "hi-IN", "en-IN", "te-IN", "ta-IN", "mr-IN"}
-DEFAULT_LANGUAGE    = "bn-IN"   # WB context — Bengali is most likely
 
 
 @dataclass
@@ -43,11 +37,8 @@ def transcribe_audio(audio_bytes: bytes, hint_language: str = "bn-IN") -> STTRes
     """
 
     try:
-        # Sarvam accepts base64-encoded audio in JSON body
-        # audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
         audio_file = io.BytesIO(audio_bytes)
         audio_file.name = "audio.ogg"
-        # print("audio_b64:", audio_file)
         client= get_sarvam_client()
         data = client.speech_to_text.transcribe(
                 file=audio_file,
@@ -60,8 +51,6 @@ def transcribe_audio(audio_bytes: bytes, hint_language: str = "bn-IN") -> STTRes
         confidence    = float(getattr(data, "confidence", 1.0) or 1.0)
 
         print(language_code,data.language_code)
-        # Normalize language code — Sarvam sometimes returns just "bn"
-        # language_code = _normalize_language_code(language_code)
         transcript=normalize_transcript(transcript)
         logger.info(f"STT success: lang={language_code}, confidence={confidence:.2f}, "
                     f"transcript='{transcript[:60]}'")
@@ -87,32 +76,3 @@ def transcribe_audio(audio_bytes: bytes, hint_language: str = "bn-IN") -> STTRes
         logger.error(f"Sarvam STT unexpected response format: {e}")
         return STTResult(transcript="", language_code=hint_language,
                          confidence=0.0, is_fallback=True)
-
-
-# def _normalize_language_code(code: str) -> str:
-    """
-    Normalize Sarvam language codes to our standard format.
-    "bn" → "bn-IN", "hi" → "hi-IN", "en" → "en-IN"
-    Already-normalized codes like "bn-IN" pass through unchanged.
-    Unknown codes → DEFAULT_LANGUAGE.
-    """
-    code = code.strip().lower()
-
-    # Already full format
-    if code in SUPPORTED_LANGUAGES:
-        return code
-
-    # Short code → expand
-    short_to_full = {
-        "bn": "bn-IN",
-        "hi": "hi-IN",
-        "en": "en-IN",
-        "te": "te-IN",
-        "ta": "ta-IN",
-        "mr": "mr-IN",
-    }
-    if code in short_to_full:
-        return short_to_full[code]
-
-    logger.warning(f"Unknown language code from STT: '{code}' — defaulting to {DEFAULT_LANGUAGE}")
-    return DEFAULT_LANGUAGE

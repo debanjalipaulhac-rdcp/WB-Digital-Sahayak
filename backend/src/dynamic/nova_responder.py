@@ -11,11 +11,14 @@ Responses are kept SHORT (2-3 sentences max) for audio delivery.
 
 import json
 import logging
+import boto3
 from src.config.settings import settings
 from src.dynamic.vector_search import VectorSearchResult
 from src.config.aws_clients import get_bedrock_nova_client
+
 logger = logging.getLogger(__name__)
 
+_bedrock_client = None
 
 SYSTEM_PROMPT = """You are WB Digital Sahayak, a helpful assistant for West Bengal government schemes.
 Answer questions based ONLY on the scheme information provided to you.
@@ -27,26 +30,39 @@ Always be specific: mention exact amounts, exact document names, exact office na
 OUT_OF_SCOPE_RESPONSE = "I don't have specific information about that. Please ask about West Bengal schemes like Lakshmir Bhandar, Swasthya Sathi, or Kanyashree."
 
 
+
+
+
 def _build_context(search_result: VectorSearchResult) -> str:
-    """Build context string from vector search results for Nova Lite."""
+    """
+    Read 'content' field (full scheme JSON) from Pinecone metadata.
+    Nova now has all docs, eligibility, benefits, Q&A to answer any question.
+    """
     if not search_result.results:
         return ""
 
     parts = []
-    for r in search_result.results[:2]:   # Max 2 schemes — keep context small
-        meta = r.metadata
-        part = (
-            f"Scheme: {meta.get('scheme_name', '')} ({meta.get('scheme_id', '')})\n"
-            f"Tag: {meta.get('tag', '')}\n"
-            f"Benefit: {meta.get('benefit', '')}\n"
-            f"Gender: {meta.get('gender', 'any')}\n"
-            f"Age: {meta.get('age_min', 'any')} to {meta.get('age_max', 'any')}\n"
-        )
+    for r in search_result.results[:2]:
+        meta        = r.metadata
+        raw_content = meta.get("content", "")
+
+        if raw_content:
+            try:
+                scheme_data = json.loads(raw_content)
+                part = json.dumps(scheme_data, indent=2, ensure_ascii=False)
+            except (json.JSONDecodeError, ValueError):
+                part = raw_content
+        else:
+            # Old format fallback — re-run seed_pinecone --delete-all to fix
+            part = (
+                f"Scheme: {meta.get('scheme_name', '')}\n"
+                f"Benefit: {meta.get('benefit', '')}\n"
+                f"Gender: {meta.get('gender', 'any')}\n"
+                f"Age: {meta.get('age_min')} to {meta.get('age_max')}\n"
+            )
         parts.append(part)
 
-    return "\n---\n".join(parts)
-
-
+    return "\n\n--- NEXT SCHEME ---\n\n".join(parts)
 def generate_response(
     user_query: str,
     search_result: VectorSearchResult,
@@ -80,32 +96,31 @@ def generate_response(
     )
 
     try:
-        
+        client = get_bedrock_nova_client()
         body = json.dumps({
-            "messages": [{"role": "user", "content": user_message}],
+            "messages": [{"role": "user", "content": [{"text":user_message}]}],
             "system": [{"text": SYSTEM_PROMPT}],
             "inferenceConfig": {
-                "maxTokens": 200,     # Short audio responses only
+                "maxTokens": 512,     # Short audio responses only
                 "temperature": 0.1,   # Low temp = consistent, factual
                 "topP": 0.9
             }
         })
 
-        client = get_bedrock_nova_client()
         response = client.converse(
             modelId=settings.BEDROCK_NOVA_LITE_MODEL_ID,
             messages= [{"role": "user", "content": [{"text":user_message}]}],
             system= [{"text": SYSTEM_PROMPT}],
             inferenceConfig= {
-                "maxTokens": 512,     
-                "temperature": 0.1,  
+                "maxTokens": 200,     # Short audio responses only
+                "temperature": 0.1,   # Low temp = consistent, factual
                 "topP": 0.9
             }
         )
-        print("Model invoked ✅")
 
+        # result   = json.loads(response["body"].read())
         answer   = response["output"]["message"]["content"][0]["text"].strip()
-        print("🤖BEDROCK_NOVA_LITE_MODEL_ID -> ",answer)
+
         logger.info(
             f"Nova Lite response: '{user_query[:40]}' → '{answer[:80]}'"
         )

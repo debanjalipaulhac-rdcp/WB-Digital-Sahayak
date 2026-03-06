@@ -31,7 +31,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse
-from twilio.rest import Client as TwilioClient
 
 # Pipeline imports
 from src.voice.stt                  import transcribe_audio, STTResult
@@ -50,7 +49,7 @@ from src.voice.language_detect      import detect_language, is_greeting
 from src.voice.audio_assembler      import assemble_audio
 from src.dynamic.vector_search      import search as vector_search
 from src.cache.background_saver     import save_new_chunks_async
-from src.dynamic.nova_responder     import generate_response, OUT_OF_SCOPE_RESPONSE
+from src.dynamic.nova_responder     import generate_response
 from src.static.greeting_handler    import get_greeting_response
 from src.dynamic.keyword_extractor  import extract_keywords
 

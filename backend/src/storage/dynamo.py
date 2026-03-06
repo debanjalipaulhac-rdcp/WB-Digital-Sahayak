@@ -10,7 +10,6 @@ import hashlib
 from typing import Optional
 from datetime import datetime, timezone
 
-import boto3
 from botocore.exceptions import ClientError
 from src.config.aws_clients import get_dynamodb_resource
 logger = logging.getLogger(__name__)
@@ -27,13 +26,13 @@ TABLE_AUDIO_CHUNKS  = os.getenv("DYNAMO_TABLE_AUDIO_CHUNKS",  "wb_sahayak_audio_
 TABLE_SCHEMES       = os.getenv("DYNAMO_TABLE_SCHEMES",       "wb_sahayak_schemes")
 
 
-def _get_resource():
-    """Returns DynamoDB resource. Uses env credentials (Lambda role or .env)."""
-    return boto3.resource(
-        "dynamodb",
-        region_name=os.getenv("AWS_REGION", "ap-south-1")
-    )
-
+# def get_dynamodb_resource():
+#     """Returns DynamoDB resource. Uses env credentials (Lambda role or .env)."""
+#     return boto3.resource(
+#         "dynamodb",
+#         region_name=os.getenv("AWS_REGION", "ap-south-1")
+#     )
+from src.config.aws_clients import get_dynamodb_resource
 
 def _hash_question(question: str) -> str:
     """
@@ -55,7 +54,7 @@ def get_user(phone_number: str) -> Optional[dict]:
     Returns None if user does not exist.
     """
     try:
-        table = _get_resource().Table(TABLE_USERS)
+        table = get_dynamodb_resource().Table(TABLE_USERS)
         resp = table.get_item(Key={"phone_number": phone_number})
         return resp.get("Item")
     except ClientError as e:
@@ -71,7 +70,7 @@ def save_user(phone_number: str, profile: dict) -> bool:
     Returns True on success, False on failure.
     """
     try:
-        table = _get_resource().Table(TABLE_USERS)
+        table = get_dynamodb_resource().Table(TABLE_USERS)
         item = {
             "phone_number": phone_number,
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -90,7 +89,7 @@ def update_user_language(phone_number: str, language_code: str) -> bool:
     Used when user switches language mid-session.
     """
     try:
-        table = _get_resource().Table(TABLE_USERS)
+        table = get_dynamodb_resource().Table(TABLE_USERS)
         table.update_item(
             Key={"phone_number": phone_number},
             UpdateExpression="SET language_code = :lang, updated_at = :ts",
@@ -112,7 +111,7 @@ def update_session_state(phone_number: str, state: str, context: dict = None) ->
     context: arbitrary dict stored alongside state (partial user profile data)
     """
     try:
-        table = _get_resource().Table(TABLE_USERS)
+        table = get_dynamodb_resource().Table(TABLE_USERS)
         expr = "SET session_state = :state, updated_at = :ts"
         vals = {
             ":state": state,
@@ -145,7 +144,7 @@ def get_qa_by_hash(question_hash: str, language_code: str) -> Optional[dict]:
     Returns item with 'answer_text' and 'audio_url' or None if not found.
     """
     try:
-        table = _get_resource().Table(TABLE_SCHEME_QA)
+        table = get_dynamodb_resource().Table(TABLE_SCHEME_QA)
         resp = table.get_item(
             Key={
                 "question_hash": question_hash,
@@ -181,7 +180,7 @@ def save_qa(
     Returns number of items written.
     Used by seed/seed_dynamo.py to populate from schemes.json.
     """
-    table = _get_resource().Table(TABLE_SCHEME_QA)
+    table = get_dynamodb_resource().Table(TABLE_SCHEME_QA)
     written = 0
     for variant in question_variants:
         try:
@@ -214,7 +213,7 @@ def get_audio_chunk(chunk_text: str, language_code: str) -> Optional[str]:
     Returns the S3 URL string, or None on cache miss.
     """
     try:
-        table = _get_resource().Table(TABLE_AUDIO_CHUNKS)
+        table = get_dynamodb_resource().Table(TABLE_AUDIO_CHUNKS)
         resp = table.get_item(
             Key={
                 "chunk_text": chunk_text.strip(),
@@ -241,7 +240,7 @@ def batch_get_audio_chunks(chunks: list[str], language_code: str) -> dict[str, O
         return {}
 
     result: dict[str, Optional[str]] = {c: None for c in chunks}
-    resource = _get_resource()
+    resource = get_dynamodb_resource()
 
     # DynamoDB batch_get_item max = 100 keys per call
     batch_size = 100
@@ -279,7 +278,7 @@ def save_audio_chunk(chunk_text: str, language_code: str, audio_url: str) -> boo
     Never blocks the main response path.
     """
     try:
-        table = _get_resource().Table(TABLE_AUDIO_CHUNKS)
+        table = get_dynamodb_resource().Table(TABLE_AUDIO_CHUNKS)
         table.put_item(Item={
             "chunk_text": chunk_text.strip(),
             "language_code": language_code,
@@ -302,7 +301,7 @@ def batch_save_audio_chunks(chunks_and_urls: list[dict], language_code: str) -> 
     if not chunks_and_urls:
         return 0
 
-    table = _get_resource().Table(TABLE_AUDIO_CHUNKS)
+    table = get_dynamodb_resource().Table(TABLE_AUDIO_CHUNKS)
     written = 0
     now = datetime.now(timezone.utc).isoformat()
 
@@ -334,7 +333,7 @@ def get_scheme(scheme_id: str) -> Optional[dict]:
     Returns None if not found.
     """
     try:
-        table = _get_resource().Table(TABLE_SCHEMES)
+        table = get_dynamodb_resource().Table(TABLE_SCHEMES)
         resp = table.get_item(Key={"scheme_id": scheme_id})
         return resp.get("Item")
     except ClientError as e:
@@ -348,7 +347,7 @@ def get_all_schemes() -> list[dict]:
     Only used at startup/seed time. Never call this per-user-request.
     """
     try:
-        table = _get_resource().Table(TABLE_SCHEMES)
+        table = get_dynamodb_resource().Table(TABLE_SCHEMES)
         resp = table.scan()
         return resp.get("Items", [])
     except ClientError as e:
@@ -362,7 +361,7 @@ def save_scheme(scheme: dict) -> bool:
     Used by seed_dynamo.py.
     """
     try:
-        table = _get_resource().Table(TABLE_SCHEMES)
+        table = get_dynamodb_resource().Table(TABLE_SCHEMES)
         table.put_item(Item={
             **scheme,
             "seeded_at": datetime.now(timezone.utc).isoformat()

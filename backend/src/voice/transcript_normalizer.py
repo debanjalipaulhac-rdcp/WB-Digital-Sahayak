@@ -106,6 +106,8 @@ SCHEME_ALIASES: list[dict] = [
             ("youth scheme",         72),
             ("unemployment scheme",  70),
             ("young stipend",        72),
+            ("Yuva",        50),
+            ("Jubo",        50),
         ]
     },
     {

@@ -34,7 +34,7 @@ Usage:
 
 import logging
 from src.config.settings import settings
-
+from twilio.rest import Client
 logger = logging.getLogger(__name__)
 
 
@@ -66,7 +66,6 @@ def get_twilio_client():
         return None
 
     try:
-        from twilio.rest import Client
         client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
         logger.info("✅ Twilio client initialised")
         return client

@@ -15,16 +15,11 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
-# S3_BUCKET      = os.getenv("S3_BUCKET_NAME", "wb-sahayak-audio")
-# AWS_REGION     = os.getenv("AWS_REGION", "ap-south-1")
 AUDIO_BASE_URL = os.getenv("S3_AUDIO_BASE_URL", f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com")
 
 
-# def _get_client():
-#     return boto3.client("s3", region_name=AWS_REGION)
 
-
-def upload_audio(audio_bytes: bytes, s3_key: str, content_type: str = "audio/ogg") -> Optional[str]:
+def upload_audio(audio_bytes: bytes, s3_key: str) -> Optional[str]:
     """
     Upload raw audio bytes to S3.
     s3_key: e.g. "chunks/bn/aadhaar_card.opus" or "qa/lakshmir_bhandar/lb_docs_bn.opus"
@@ -84,8 +79,8 @@ def download_audio(s3_key: str) -> Optional[bytes]:
     Returns bytes or None on failure.
     """
     try:
-        client = _get_client()
-        resp = client.get_object(Bucket=S3_BUCKET, Key=s3_key)
+        client = get_s3_client()
+        resp = client.get_object(Bucket=settings.S3_BUCKET_NAME, Key=s3_key)
         return resp["Body"].read()
     except ClientError as e:
         logger.error(f"download_audio failed for '{s3_key}': {e}")
@@ -98,8 +93,8 @@ def delete_audio(s3_key: str) -> bool:
     Used when regenerating with a better voice or fixing a TTS error.
     """
     try:
-        client = _get_client()
-        client.delete_object(Bucket=S3_BUCKET, Key=s3_key)
+        client = get_s3_client()
+        client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=s3_key)
         logger.info(f"Deleted S3 object: {s3_key}")
         return True
     except ClientError as e:
@@ -114,7 +109,7 @@ def list_audio_keys(prefix: str) -> list[str]:
     Used by admin tools and precache_audio.py to check what's already seeded.
     """
     try:
-        client = _get_client()
+        client = get_s3_client()
         paginator = client.get_paginator("list_objects_v2")
         keys = []
         for page in paginator.paginate(Bucket=settings.S3_BUCKET_NAME, Prefix=prefix):

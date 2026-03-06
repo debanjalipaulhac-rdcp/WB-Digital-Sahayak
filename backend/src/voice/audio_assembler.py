@@ -16,7 +16,7 @@ from src.storage.s3 import upload_audio, get_s3_client
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
-
+from src.voice.audio_converter import wav_to_ogg
 COMBINED_AUDIO_PREFIX = "combined/"
 MAX_WORKERS = 5
 
@@ -102,7 +102,8 @@ def assemble_audio(chunk_urls: list[str]) -> Optional[str]:
         return None
 
     combined_bytes = b"".join(ordered_bytes)
-    url = upload_audio(combined_bytes, combined_key, content_type="audio/opus")
+    audio=wav_to_ogg(combined_bytes)
+    url = upload_audio(audio, combined_key)
 
     if url:
         logger.info(
