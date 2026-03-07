@@ -8,7 +8,7 @@ const EligibilityModal = dynamic(() => import('./CheckEligibilityModal'))
 const VoiceModal = dynamic(() => import('./VoiceSearchModal'))
 
 interface Props {
-    user: { name: string | null; phone: string } | null
+    user?: { name: string | null; phone: string } | null
 }
 
 export function ModalOrchestrator({ user }: Props) {

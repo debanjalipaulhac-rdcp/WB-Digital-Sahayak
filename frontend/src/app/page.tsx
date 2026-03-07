@@ -1,9 +1,11 @@
+// SERVER COMPONENT — SSR, no "use client"
 import { cookies } from 'next/headers'
 import { Sparkles } from 'lucide-react'
 import translations from '@/lib/i18n'
 import SchemeCard from '@/components/SchemeCard'
 import SearchBar, { EligibilityTrigger } from '@/components/SearchBar'
 import { getSchemes } from '@/lib/server/api'
+import Link from 'next/link'
 
 export const metadata = {
     title: 'WB Digital Sahayak — Find Your Welfare Benefits',
@@ -16,21 +18,22 @@ export default async function HomePage() {
     const lang = ['en', 'bn', 'hi'].includes(rawLang ?? '') ? rawLang! : 'en'
     const tx = translations[lang] || translations['en']
 
-    const data = await getSchemes()
+    // Fetch schemes with proper error handling
+    const data = await getSchemes({ page_size: 8, sort: 'relevance' })
     const schemes = data?.schemes || []
 
     const stats = (tx.stats as string[]) || ['50+', '2M+', '100%', '24/7']
     const statLabels = (tx.stat_labels as string[]) || ['Active Schemes', 'Beneficiaries', 'Digital Process', 'Support Access']
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-background">
 
             {/* ── HERO ── */}
-            <section className="bg-gradient-to-br from-blue-600 to-blue-800 py-16 px-5 text-center">
+            <section className="bg-linear-180 from-primary/90 to-primary py-16 px-5 text-center">
                 <div className="max-w-2xl mx-auto">
 
                     {/* Pill badge */}
-                    <div className="animate-fade-up inline-block border border-white/50 rounded-full px-4 py-1 mb-5">
+                    <div className="animate-fade-up inline-block border border-accent-foreground rounded-full px-4 py-1 mb-5">
                         <span className="text-xs font-semibold tracking-widest uppercase text-white">
                             {tx.hero_badge}
                         </span>
@@ -48,20 +51,24 @@ export default async function HomePage() {
                     <p className="animate-fade-up delay-2 text-sm text-white/75 mb-8">
                         {tx.hero_subtitle}
                     </p>
+                    <div className="m-auto inline-block">
 
-                    {/* SearchBar */}
-                    <SearchBar showEligibilityTrigger />
+                        {/* SearchBar */}
+                        <SearchBar showEligibilityTrigger />
+                    </div>
 
                     {/* Quick chips */}
-                    <div className="flex gap-2.5 justify-center flex-wrap mt-4">
+                    <div className="flex gap-2.5 justify-center items-center flex-wrap mt-4 ">
                         {['Taposili Bandhu', 'Lakshmir Bhandar', 'Kanyashree'].map((chip, i) => (
-                            <a
+                            <Link
                                 key={chip}
                                 href={`/search?q=${encodeURIComponent(chip)}`}
-                                className={`hero-chip animate-fade-up delay-${i + 1}`}
+                                className={`opactity-0 rounded-full border border-gray-300 animate-fade-up delay-${i + 1} text-white`}
                             >
-                                {chip}
-                            </a>
+                                <span className="text-xs tracking-wide uppercase p-4">
+                                    {chip}
+                                </span>
+                            </Link>
                         ))}
                     </div>
                 </div>
@@ -69,7 +76,7 @@ export default async function HomePage() {
 
             {/* ── RECOMMENDED BANNER ── */}
             <section className="pt-7 px-5 max-w-6xl mx-auto">
-                <div className="bg-white border border-gray-200 rounded-2xl p-6 flex items-center justify-between flex-wrap gap-5">
+                <div className="bg-accent border rounded-2xl p-6 flex items-center justify-between flex-wrap gap-5">
                     <div className="flex-1 min-w-56">
                         <div className="flex items-center gap-1.5 mb-2">
                             <Sparkles size={14} className="text-blue-600" />
@@ -77,10 +84,10 @@ export default async function HomePage() {
                                 {tx.recommended_label}
                             </span>
                         </div>
-                        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1.5 leading-snug">
+                        <h2 className="text-lg sm:text-xl font-semibold mb-1.5 leading-snug">
                             {tx.recommended_title}
                         </h2>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                             {tx.recommended_sub}
                         </p>
                     </div>
@@ -91,7 +98,7 @@ export default async function HomePage() {
             {/* ── SCHEME CATEGORIES ── */}
             <section className="pt-10 pb-5 px-5 max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-5">
-                    <h2 className="text-xl font-bold text-gray-900 border-l-4 border-blue-600 pl-3 leading-snug">
+                    <h2 className="text-xl font-bold border-l-4 border-blue-600 pl-3 leading-snug">
                         Education &amp; Student Support
                     </h2>
                     <a href="/schemes" className="text-sm text-blue-600 font-medium whitespace-nowrap hover:underline">
@@ -101,7 +108,7 @@ export default async function HomePage() {
 
                 <div className="scheme-cards-scroll">
                     {schemes.map((scheme) => (
-                        <SchemeCard key={scheme.scheme_id || scheme.slug} scheme={scheme} />
+                        <SchemeCard key={scheme.scheme_id} scheme={scheme} />
                     ))}
                 </div>
             </section>

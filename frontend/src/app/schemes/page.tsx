@@ -1,7 +1,7 @@
+// SERVER COMPONENT — SSR
 import { getSchemes } from '@/lib/server/api'
 import { cookies } from 'next/headers'
 import SchemeCard from '@/components/SchemeCard'
-import type { Scheme } from '@/types'
 import { Search } from 'lucide-react'
 
 export const metadata = {
@@ -11,45 +11,36 @@ export const metadata = {
 
 const TAG_OPTIONS = [
     { label: 'All', value: '' },
-    { label: 'Women', value: 'WOMEN' },
-    { label: 'Health', value: 'HEALTH' },
-    { label: 'Scholarship', value: 'SCHOLARSHIP' },
-    { label: 'Pension', value: 'PENSION' },
-    { label: 'Youth', value: 'YOUTH' },
-    { label: 'Girl Child', value: 'GIRL_CHILD' },
-    { label: 'Agriculture', value: 'AGRICULTURE' },
-    { label: 'Marriage', value: 'MARRIAGE' },
+    { label: 'Women', value: 'women' },
+    { label: 'Health', value: 'health' },
+    { label: 'Student', value: 'student' },
+    { label: 'Farmers', value: 'farmers' },
+    { label: 'Girl Child', value: 'girl-child' },
 ]
 
 interface SchemesPageProps {
-    searchParams: Promise<{ tag?: string; q?: string; page?: string }>
+    searchParams: Promise<{ category?: string; q?: string; page?: string }>
 }
 
 export default async function SchemesPage({ searchParams }: SchemesPageProps) {
+    console.log(searchParams)
     const params = await searchParams
-    const activeTag = params.tag || ''
+    const activeCategory = params.category || ''
     const q = params.q || ''
     const page = parseInt(params.page || '1', 10)
 
-    // Read language for potential multi-lang display
-    const cookieStore = await cookies()
-    void cookieStore // used indirectly
-
-    // Fetch from real API
-    const data = await getSchemes({ tag: activeTag || undefined, page }).catch(() => null)
-    let schemes: Scheme[] = data?.schemes || []
-    const total = data?.total ?? schemes.length
-    const pages = data?.pages ?? 1
-
-    // Client-side name filter (when backend doesn't support name search on /schemes)
-    if (q) {
-        const lq = q.toLowerCase()
-        schemes = schemes.filter(s =>
-            s.scheme_name.toLowerCase().includes(lq) ||
-            (s.description ?? '').toLowerCase().includes(lq) ||
-            (s.benefit_display ?? '').toLowerCase().includes(lq)
-        )
-    }
+    // Fetch schemes using proper API
+    const data = await getSchemes({
+        q: q || undefined,
+        category: activeCategory || undefined,
+        page,
+        page_size: 12,
+        sort: 'relevance',
+    })
+    
+    const schemes = data?.schemes ?? []
+    const total = data?.total ?? 0
+    const totalPages = data?.pages ?? 1
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -89,17 +80,17 @@ export default async function SchemesPage({ searchParams }: SchemesPageProps) {
                 {/* ── Tag filter pills ── */}
                 <div className="flex flex-wrap gap-2 mb-7">
                     {TAG_OPTIONS.map(({ label, value }) => {
-                        const isActive = activeTag === value
+                        const isActive = activeCategory === value
                         const href = value
-                            ? `/schemes?tag=${value}${q ? `&q=${encodeURIComponent(q)}` : ''}`
+                            ? `/schemes?category=${value}${q ? `&q=${encodeURIComponent(q)}` : ''}`
                             : `/schemes${q ? `?q=${encodeURIComponent(q)}` : ''}`
                         return (
                             <a
                                 key={value}
                                 href={href}
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${isActive
-                                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                        : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
                                     }`}
                             >
                                 {label}
@@ -127,12 +118,13 @@ export default async function SchemesPage({ searchParams }: SchemesPageProps) {
                 )}
 
                 {/* ── Pagination ── */}
-                {pages > 1 && (
+                {totalPages > 1 && (
                     <div className="flex justify-center gap-1.5 mt-10">
-                        {Array.from({ length: pages }, (_, i) => i + 1).map((p) => {
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            const p = i + 1
                             const isActive = p === page
                             const href = `/schemes?${new URLSearchParams({
-                                ...(activeTag ? { tag: activeTag } : {}),
+                                ...(activeCategory ? { category: activeCategory } : {}),
                                 ...(q ? { q } : {}),
                                 page: String(p),
                             })}`
@@ -141,8 +133,8 @@ export default async function SchemesPage({ searchParams }: SchemesPageProps) {
                                     key={p}
                                     href={href}
                                     className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${isActive
-                                            ? 'bg-blue-600 text-white'
-                                            : 'border border-gray-200 text-gray-700 hover:border-blue-400 hover:text-blue-600'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'border border-gray-200 text-gray-700 hover:border-blue-400 hover:text-blue-600'
                                         }`}
                                 >
                                     {p}

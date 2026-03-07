@@ -227,6 +227,8 @@ export interface ProfileData {
     pays_income_tax?: boolean
     has_daughter?: boolean
     has_school_child?: boolean
+    is_unemployed?: boolean
+    is_enrolled_in_school?: boolean
     annual_income_bracket?: string
     verified: boolean
     completed: boolean

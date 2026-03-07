@@ -14,27 +14,23 @@ export default async function ProfilePage() {
     const profile = await getProfile()
 
     return (
-        <div style={{ background: 'var(--color-bg)', minHeight: '100vh', paddingBottom: 80 }}>
-            <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-4xl mx-auto px-5 py-8">
+                <div className="flex items-start justify-between flex-wrap gap-3 mb-7">
                     <div>
-                        <h1 style={{ fontWeight: 700, fontSize: 32, color: 'var(--color-text)', margin: '0 0 6px' }}>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">
                             Personal Details
                         </h1>
-                        <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0 }}>
+                        <p className="text-sm text-gray-600">
                             Ensure your information is up to date to find the best schemes for you.
                         </p>
                     </div>
-                    {profile?.verified && (
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: 6,
-                            background: '#F0FDF4', border: '1.5px solid #D1FAE5',
-                            borderRadius: 999, padding: '8px 16px',
-                        }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#057A55" strokeWidth="2">
+                    {profile?.completed && (
+                        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#057A55' }}>KYC Verified</span>
+                            <span className="text-sm font-medium text-green-700">Profile Complete</span>
                         </div>
                     )}
                 </div>

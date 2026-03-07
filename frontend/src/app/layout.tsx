@@ -1,9 +1,14 @@
+// SERVER COMPONENT — never "use client"
 import './globals.css'
 import { Toaster } from 'sonner'
 import { cookies } from 'next/headers'
 import Navbar from '@/components/Navbar'
 import { ModalOrchestrator } from '@/components/ModalOrchestrator'
 import { getCurrentUser } from '@/lib/server/api'
+import { JetBrains_Mono } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
 
 export const metadata = {
     title: 'WB Digital Sahayak | ডিজিটাল সহায়ক',
@@ -18,15 +23,21 @@ export const viewport = {
     maximumScale: 1,
 }
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ 
+    children,
+    recommendations 
+}: { 
+    children: React.ReactNode
+    recommendations?: React.ReactNode
+}) {
     const cookieStore = await cookies()
     const lang = cookieStore.get('wb_lang')?.value || 'en'
     const validLang = ['en', 'bn', 'hi'].includes(lang) ? lang : 'en'
 
-    const user = await getCurrentUser()
+    const user = await getCurrentUser()  // cookie-based, no waterfall
 
     return (
-        <html lang={validLang === 'bn' ? 'bn' : validLang === 'hi' ? 'hi' : 'en'}>
+        <html lang={validLang === 'bn' ? 'bn' : validLang === 'hi' ? 'hi' : 'en'} className={cn("font-mono", jetbrainsMono.variable)}>
             <head>
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -48,7 +59,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </head>
             <body>
                 <Navbar lang={validLang} user={user} />
-                <main>{children}</main>
+                <ModalOrchestrator user={user} />
+                <main>
+                    {children}
+                    {recommendations}
+                </main>
 
                 <footer className="bg-white border-t border-gray-200 px-5 py-6 flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-2.5">
@@ -72,8 +87,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                         <a href="#" className="text-sm text-gray-500 hover:text-blue-600 transition-colors no-underline">Help Center</a>
                     </div>
                 </footer>
-
-                <ModalOrchestrator user={user} />
 
                 <Toaster
                     position="bottom-center"

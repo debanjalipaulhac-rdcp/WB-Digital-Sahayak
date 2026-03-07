@@ -24,17 +24,7 @@ export default function SearchBar({ defaultQuery = '', showEligibilityTrigger = 
 
     return (
         <>
-            <div style={{
-                background: '#fff',
-                borderRadius: 16,
-                maxWidth: 600,
-                margin: '0 auto 20px',
-                padding: '6px 6px 6px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-            }}>
+            <div className='flex items-center p-2 gap-2 max-w-xl rounded-xl shadow bg-white text-black justify-center min-w-lg'>
                 <Search size={20} color="#1A56DB" style={{ flexShrink: 0 }} />
                 <input
                     type="text"
@@ -42,16 +32,13 @@ export default function SearchBar({ defaultQuery = '', showEligibilityTrigger = 
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                    style={{
-                        flex: 1, border: 'none', outline: 'none',
-                        fontSize: 15, color: 'var(--color-text)',
-                        background: 'transparent', minWidth: 0, padding: '8px 0',
-                    }}
+                   
+                    className='text-black flex-1 px-2 focus:outline-none'
                 />
                 <button className="mic-btn" aria-label="Voice search" onClick={() => setVoiceOpen(true)}>
                     <Mic size={18} color="#1A56DB" />
                 </button>
-                <button className="search-btn" onClick={() => handleSearch()}>
+                <button className="rounded-lg bg-primary px-4 py-2 text-white" onClick={() => handleSearch()}>
                     Search
                 </button>
             </div>

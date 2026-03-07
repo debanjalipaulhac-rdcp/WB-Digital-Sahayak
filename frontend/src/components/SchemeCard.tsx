@@ -1,5 +1,6 @@
 import { Bike, GraduationCap, Award, ExternalLink, LucideIcon } from 'lucide-react'
 import type { Scheme } from '@/types'
+import Link from 'next/link'
 
 const ICON_MAP: Record<string, LucideIcon> = { Bike, GraduationCap, Award }
 
@@ -21,21 +22,21 @@ interface SchemeCardProps {
 }
 
 export default function SchemeCard({ scheme }: SchemeCardProps) {
-    const id = scheme.scheme_id || scheme.slug || ''
-    const label = scheme.scheme_name || scheme.name || ''
+    const id = scheme.scheme_id || ''
+    const label = scheme.name || scheme.scheme_name || ''
     const tag = scheme.tag || ''
     const icon = scheme.icon || ''
-    const dept = scheme.dept || scheme.dept_name || scheme.department || ''
-    const desc = scheme.description || scheme.benefits?.note_en || ''
+    const dept = scheme.dept || scheme.department || ''
+    const desc = scheme.description || ''
 
     const IconComponent = ICON_MAP[icon] || Award
     const tagCls = TAG_STYLES[tag] || TAG_STYLES['SCHEME']
 
     return (
-        <a href={`/scheme/${id}`} className="scheme-card-link group">
+        <Link href={`/schemes/${id}`} className="bg-accent rounded-xl p-4 hover:-translate-0.5 transform-3d translate-0 transition-all">
             {/* Top row: icon + tag */}
             <div className="flex items-start justify-between">
-                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center shrink-0">
                     <IconComponent size={24} className="text-blue-600" />
                 </div>
                 {tag && (
@@ -46,27 +47,27 @@ export default function SchemeCard({ scheme }: SchemeCardProps) {
             </div>
 
             {/* Scheme name */}
-            <div className="font-semibold text-[17px] text-gray-900 mt-3 leading-snug">
+            <div className="font-semibold text-[17px]  mt-3 leading-snug">
                 {label}
             </div>
 
             {/* Benefit pill */}
             {scheme.benefit_display && (
-                <div className="mt-1.5 text-xs font-semibold text-blue-700 bg-blue-50 rounded px-2 py-0.5 w-fit">
+                <div className="mt-1.5 text-xs font-semibold text-blue-700 bg-muted rounded px-2 py-0.5 w-fit">
                     {scheme.benefit_display}
                 </div>
             )}
 
             {/* Description */}
-            <p className="line-clamp-3 text-sm text-gray-500 mt-2 leading-relaxed flex-grow">
+            <p className=" text-sm text-muted-foreground mt-2 leading-relaxed grow line-clamp-3">
                 {desc}
             </p>
 
             {/* Footer */}
             <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                <span className="text-[11px] text-gray-400 leading-tight">{dept}</span>
-                <ExternalLink size={14} className="text-blue-500 group-hover:text-blue-700 transition-colors" />
+                <span className="text-[11px] text-primary-foreground leading-tight">{dept}</span>
+                <ExternalLink size={14} className="text-primary/60 group-hover:text-blue-700 transition-colors" />
             </div>
-        </a>
+        </Link>
     )
 }

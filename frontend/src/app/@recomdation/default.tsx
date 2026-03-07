@@ -1,4 +1,6 @@
-// Required for parallel routes: renders when no slot matches
-export default function RecomdationDefault() {
-    return null
+// Default fallback for recommendations slot
+export default function RecommendationsDefault() {
+  return (
+    <div className="">No recomdations</div>
+  )
 }

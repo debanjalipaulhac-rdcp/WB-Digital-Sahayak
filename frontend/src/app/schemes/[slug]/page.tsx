@@ -1,348 +1,273 @@
-import { cookies } from 'next/headers'
-import {
-    Bike, GraduationCap, Award, Heart, Star, HeartPulse, Wheat, BookOpen,
-    SlidersHorizontal, Users, CreditCard, FileText, CalendarClock, IndianRupee,
-    ShieldCheck, ArrowRight, Lightbulb, ClipboardList, FolderOpen, ExternalLink, Bot,
-    LucideIcon
-} from 'lucide-react'
+import { Suspense } from 'react'
+import { notFound } from 'next/navigation'
+import { ArrowLeft, CheckCircle, FileText, Users } from 'lucide-react'
+import { getSchemeById, getRecommendations } from '@/lib/server/api'
+import type { Scheme } from '@/types'
+import SchemeCard from '@/components/SchemeCard'
+import EligibilityChecker from '@/components/EligibilityChecker'
 
-interface DirScheme {
-    slug: string
-    name: string
-    tag: string
-    icon: string
-    dept: string
-    accentColor: string
-    desc: string
-    benefitLine: string
-    benefitIcon: string
+interface SchemePageProps {
+  params: Promise<{ slug: string }>
 }
 
-const ALL_DIR_SCHEMES: DirScheme[] = [
-    {
-        slug: 'sabuj-sathi', name: 'Sabuj Sathi', tag: 'SCHEME', icon: 'Bike',
-        dept: 'Dept. of Backward Classes', accentColor: '#3B82F6',
-        desc: 'Bicycle distribution scheme for students in classes IX to XII to encourage higher education and reduce dropouts.',
-        benefitLine: '5M+ Beneficiaries', benefitIcon: 'Users'
-    },
-    {
-        slug: 'medhashree', name: 'Medhashree', tag: 'SCHOLARSHIP', icon: 'GraduationCap',
-        dept: 'Backward Classes Welfare', accentColor: '#10B981',
-        desc: 'Pre-matric scholarship for OBC students in West Bengal to support their educational journey.',
-        benefitLine: 'DBT Transfer', benefitIcon: 'CreditCard'
-    },
-    {
-        slug: 'svmcm', name: 'SVMCM', tag: 'MERIT-CUM-MEANS', icon: 'Award',
-        dept: 'Higher Education Dept.', accentColor: '#7C3AED',
-        desc: 'Swami Vivekananda Merit-cum-Means Scholarship for meritorious students from economically weaker sections.',
-        benefitLine: 'Online Application', benefitIcon: 'FileText'
-    },
-    {
-        slug: 'lakshmir-bhandar', name: 'Lakshmir Bhandar', tag: 'FINANCIAL AID', icon: 'Heart',
-        dept: 'Women & Child Development', accentColor: '#EC4899',
-        desc: 'Basic income support to female heads of households ensuring financial security and empowerment.',
-        benefitLine: 'Monthly Payout', benefitIcon: 'CalendarClock'
-    },
-    {
-        slug: 'kanyashree', name: 'Kanyashree', tag: 'GIRL CHILD', icon: 'Star',
-        dept: 'Women & Child Development', accentColor: '#F59E0B',
-        desc: 'Conditional cash transfer scheme to improve the status and wellbeing of girls in West Bengal.',
-        benefitLine: 'Annual Payout', benefitIcon: 'IndianRupee'
-    },
-    {
-        slug: 'swasthya-sathi', name: 'Swasthya Sathi', tag: 'HEALTH', icon: 'HeartPulse',
-        dept: 'Health & Family Welfare', accentColor: '#EF4444',
-        desc: 'Health insurance scheme providing cashless treatment up to ₹5 lakh per family per year.',
-        benefitLine: '₹5L Coverage', benefitIcon: 'ShieldCheck'
-    },
-    {
-        slug: 'krishak-bondhu', name: 'Krishak Bondhu', tag: 'AGRICULTURE', icon: 'Wheat',
-        dept: 'Agriculture Dept.', accentColor: '#84CC16',
-        desc: 'Financial assistance to farmers for crop cultivation and support during distress.',
-        benefitLine: '₹10,000/year', benefitIcon: 'IndianRupee'
-    },
-    {
-        slug: 'aikyashree', name: 'Aikyashree', tag: 'SCHOLARSHIP', icon: 'BookOpen',
-        dept: 'Minority Affairs', accentColor: '#6366F1',
-        desc: 'Scholarship for Minority Students providing financial assistance for various levels of education.',
-        benefitLine: 'Annual Scholarship', benefitIcon: 'GraduationCap'
-    },
-]
-
-const ICON_MAP: Record<string, LucideIcon> = {
-    Bike, GraduationCap, Award, Heart, Star, HeartPulse, Wheat, BookOpen,
-    Users, CreditCard, FileText, CalendarClock, IndianRupee, ShieldCheck, ArrowRight, ExternalLink
-}
-
-const CATEGORY_TABS = [
-    { label: 'All Schemes', value: '' },
-    { label: 'Education', value: 'education' },
-    { label: 'Health & Welfare', value: 'health' },
-    { label: 'Social Security', value: 'social' },
-    { label: 'Agriculture', value: 'agriculture' },
-    { label: 'Women', value: 'women' },
-    { label: 'Farmers', value: 'farmers' },
-]
-
-const PAGE_SIZE = 4
-
-function DirectorySchemeCard({ scheme }: { scheme: DirScheme }) {
-    const IconComp = ICON_MAP[scheme.icon] || Award
-    const BenefitIcon = ICON_MAP[scheme.benefitIcon] || Users
-    return (
-        <a href={`/scheme/${scheme.slug}`} className="dir-card"
-            style={{ borderLeftColor: scheme.accentColor }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{
-                    width: 40, height: 40,
-                    background: scheme.accentColor + '20',
-                    borderRadius: 10,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                    <IconComp size={22} color={scheme.accentColor} />
-                </div>
-                <span style={{
-                    fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase',
-                    background: scheme.accentColor + '20', color: scheme.accentColor,
-                    padding: '2px 8px', borderRadius: 4,
-                }}>{scheme.tag}</span>
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: scheme.accentColor, marginBottom: 3 }}>
-                {scheme.dept}
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--color-text)', marginBottom: 6 }}>
-                {scheme.name}
-            </div>
-            <p className="line-clamp-3" style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 auto', lineHeight: 1.5, flexGrow: 1 }}>
-                {scheme.desc}
-            </p>
-            <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--color-border)',
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-muted)' }}>
-                    <BenefitIcon size={14} />
-                    {scheme.benefitLine}
-                </div>
-                <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: '#111928', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                    <ArrowRight size={16} color="white" />
-                </div>
-            </div>
-        </a>
-    )
-}
-
-interface SearchParams {
-    category?: string
-    page?: string
-}
-
-export default async function SchemesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-    const params = await searchParams
-    const category = params?.category || ''
-    const page = parseInt(params?.page || '1', 10)
-
-    let schemes = ALL_DIR_SCHEMES
-    const catMap: Record<string, string[]> = {
-        education: ['SCHOLARSHIP', 'MERIT-CUM-MEANS', 'SCHEME'],
-        health: ['HEALTH'],
-        social: ['FINANCIAL AID', 'GIRL CHILD'],
-        agriculture: ['AGRICULTURE'],
-        women: ['FINANCIAL AID', 'GIRL CHILD'],
-        farmers: ['AGRICULTURE'],
+export async function generateMetadata({ params }: SchemePageProps) {
+  const { slug } = await params
+  console.log(slug)
+  const scheme = await getSchemeById(slug)
+  
+  if (!scheme) {
+    return {
+      title: 'Scheme Not Found | WB Digital Sahayak',
     }
-    if (category && catMap[category]) {
-        schemes = schemes.filter(s => catMap[category].includes(s.tag))
-    }
+  }
 
-    const total = schemes.length
-    const totalPages = Math.ceil(total / PAGE_SIZE)
-    const paged = schemes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  return {
+    title: `${scheme.scheme_name} | WB Digital Sahayak`,
+    description: scheme.scheme_name_bn || scheme.scheme_name,
+  }
+}
 
-    // lang for potential future use
-    const cookieStore = await cookies()
-    const rawLang = cookieStore.get('wb_lang')?.value
-    const _lang = ['en', 'bn', 'hi'].includes(rawLang ?? '') ? rawLang! : 'en'
-    void _lang
+export default async function SchemePage({ params }: SchemePageProps) {
+  const { slug } = await params
+  const scheme = await getSchemeById(slug)
 
-    return (
-        <div style={{ background: 'var(--color-bg)', minHeight: '100vh', padding: '32px 20px 48px' }}>
-            <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+  if (!scheme) {
+    notFound()
+  }
 
-                {/* Header */}
-                <div style={{ marginBottom: 28 }}>
-                    <h1 style={{ fontWeight: 700, fontSize: 32, color: 'var(--color-text)', margin: '0 0 6px' }}>
-                        Schemes Directory
-                    </h1>
-                    <p style={{ color: 'var(--color-muted)', fontSize: 14, margin: 0 }}>
-                        Discover and apply for welfare programs tailored to your needs across all departments.
-                    </p>
-                </div>
-
-                {/* Search bar */}
-                <form action="/search" method="get" style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    border: '1.5px solid var(--color-border)', borderRadius: 14,
-                    padding: '12px 16px', background: 'var(--color-surface, #fff)', marginBottom: 20,
-                }}>
-                    <SlidersHorizontal size={18} color="var(--color-muted)" style={{ flexShrink: 0 }} />
-                    <input name="q" type="text" placeholder="Search schemes, departments, or keywords..."
-                        style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: 'var(--color-text)' }} />
-                    <button type="submit" style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        border: '1.5px solid var(--color-border)', borderRadius: 8,
-                        padding: '7px 14px', background: 'transparent', cursor: 'pointer',
-                        fontSize: 13, color: 'var(--color-muted)', whiteSpace: 'nowrap',
-                    }}>
-                        <SlidersHorizontal size={14} /> Filters
-                    </button>
-                </form>
-
-                {/* Category tabs */}
-                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 28, paddingBottom: 4 }}>
-                    {CATEGORY_TABS.map(tab => (
-                        <a key={tab.value} href={`/schemes${tab.value ? '?category=' + tab.value : ''}`}
-                            style={{
-                                padding: '8px 18px', borderRadius: 999, whiteSpace: 'nowrap',
-                                fontSize: 14, fontWeight: 500, textDecoration: 'none',
-                                flexShrink: 0,
-                                ...(category === tab.value
-                                    ? { background: '#111928', color: '#fff' }
-                                    : { border: '1.5px solid var(--color-border)', color: '#6B7280', background: 'transparent' }
-                                ),
-                            }}>
-                            {tab.label}
-                        </a>
-                    ))}
-                </div>
-
-                {/* Two column layout */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 65fr) minmax(0, 32fr)', gap: 24, alignItems: 'start' }}
-                    className="detail-grid">
-
-                    {/* Main: cards grid */}
-                    <div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 32 }}>
-                            {paged.map(s => <DirectorySchemeCard key={s.slug} scheme={s} />)}
-                        </div>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                {page > 1 && (
-                                    <a href={`/schemes?page=${page - 1}${category ? '&category=' + category : ''}`}
-                                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', color: 'var(--color-muted)', textDecoration: 'none', fontSize: 14 }}>
-                                        ← Prev
-                                    </a>
-                                )}
-                                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                                    <a key={p} href={`/schemes?page=${p}${category ? '&category=' + category : ''}`}
-                                        style={{
-                                            width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontWeight: 500, fontSize: 14, textDecoration: 'none',
-                                            ...(p === page
-                                                ? { background: '#1A56DB', color: '#fff' }
-                                                : { border: '1.5px solid var(--color-border)', color: 'var(--color-text)' }
-                                            ),
-                                        }}>
-                                        {p}
-                                    </a>
-                                ))}
-                                {page < totalPages && (
-                                    <a href={`/schemes?page=${page + 1}${category ? '&category=' + category : ''}`}
-                                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', color: 'var(--color-muted)', textDecoration: 'none', fontSize: 14 }}>
-                                        Next →
-                                    </a>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Sidebar */}
-                    <div>
-                        {/* AI Sahayak Card */}
-                        <div style={{ border: '1.5px solid #BFDBFE', borderRadius: 14, padding: 20 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                                <div className="pulse-dot" />
-                                <div style={{
-                                    width: 48, height: 48, background: '#EFF6FF', borderRadius: '50%',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                }}>
-                                    <Bot size={24} color="#1A56DB" />
-                                </div>
-                            </div>
-                            <div style={{ fontWeight: 600, fontSize: 17, color: 'var(--color-text)', marginBottom: 6 }}>AI Sahayak</div>
-                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px', lineHeight: 1.5 }}>
-                                Your intelligent assistant is online and ready to guide you to the perfect scheme.
-                            </p>
-                            <a href="/eligibility" style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                background: '#1A56DB', color: '#fff', borderRadius: 10, padding: '12px',
-                                textDecoration: 'none', fontWeight: 500, fontSize: 14, width: '100%',
-                                boxSizing: 'border-box',
-                            }}>
-                                💬 Start Chat
-                            </a>
-                        </div>
-
-                        {/* Quick Help */}
-                        <div style={{ border: '1.5px solid var(--color-border)', borderRadius: 14, padding: 20, marginTop: 16, background: 'var(--color-surface, #fff)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                                <Lightbulb size={18} color="#F59E0B" />
-                                <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-text)' }}>Quick Help</span>
-                            </div>
-                            {[
-                                { Icon: FileText, title: 'Application Process', sub: 'Step-by-step guide to apply' },
-                                { Icon: ClipboardList, title: 'Track Application', sub: 'Check your current status' },
-                                { Icon: FolderOpen, title: 'Document Library', sub: 'Required paperwork checklist' },
-                            ].map(({ Icon, title, sub }, i) => (
-                                <div key={title} style={{
-                                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
-                                    borderBottom: i < 2 ? '1px solid var(--color-border)' : 'none',
-                                    cursor: 'pointer',
-                                }}>
-                                    <div style={{ width: 36, height: 36, background: '#F3F4F6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                        <Icon size={18} color="#6B7280" />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{title}</div>
-                                        <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{sub}</div>
-                                    </div>
-                                </div>
-                            ))}
-                            <a href="/support" style={{ display: 'block', marginTop: 12, color: '#1A56DB', fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
-                                Browse Support Center →
-                            </a>
-                        </div>
-
-                        {/* Govt Portals */}
-                        <div style={{ border: '1.5px solid var(--color-border)', borderRadius: 14, padding: 20, marginTop: 16, background: 'var(--color-surface, #fff)' }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 12 }}>
-                                GOVT. PORTALS
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                                {[
-                                    { label: 'Egiye Bangla', href: 'https://egieyebangla.gov.in' },
-                                    { label: 'Duare Sarkar', href: 'https://wbduaresarkar.gov.in' },
-                                ].map(({ label, href }) => (
-                                    <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{
-                                        border: '1.5px solid var(--color-border)', borderRadius: 10, padding: '12px 8px',
-                                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                                        fontSize: 12, textDecoration: 'none', color: 'var(--color-text)', textAlign: 'center',
-                                        transition: 'background 0.15s',
-                                    }}>
-                                        <ExternalLink size={16} color="#1A56DB" />
-                                        {label}
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <section className="bg-white border-b border-gray-200">
+        <div className="max-w-4xl mx-auto px-5 py-6">
+          <a 
+            href="/schemes" 
+            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 mb-4"
+          >
+            <ArrowLeft size={16} />
+            Back to All Schemes
+          </a>
+          
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <FileText className="text-blue-600" size={24} />
             </div>
+            
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                  {scheme.tag?.toUpperCase() || 'SCHEME'}
+                </span>
+              </div>
+              
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                {scheme.scheme_name}
+                {scheme.scheme_name_bn && (
+                  <span className="block text-lg font-normal text-gray-600 mt-1">
+                    {scheme.scheme_name_bn}
+                  </span>
+                )}
+              </h1>
+              
+              {scheme.description && (
+                <p className="text-gray-600 mb-3">{scheme.description}</p>
+              )}
+              
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                {scheme.department && (
+                  <div className="flex items-center gap-1">
+                    <FileText size={14} />
+                    {scheme.department}
+                  </div>
+                )}
+                {scheme.benefit_display && (
+                  <div className="flex items-center gap-1">
+                    <CheckCircle size={14} />
+                    {scheme.benefit_display}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-    )
+      </section>
+
+      <div className="max-w-4xl mx-auto px-5 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Eligibility Rules */}
+            {scheme.eligibility && (
+              <section className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <CheckCircle className="text-green-600" size={20} />
+                  Eligibility Criteria
+                </h2>
+                
+                <div className="space-y-3 text-sm text-gray-700">
+                  {scheme.eligibility.age_min && scheme.eligibility.age_max && (
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                      <CheckCircle className="text-green-500 mt-0.5 shrink-0" size={16} />
+                      <div>Age: {scheme.eligibility.age_min} - {scheme.eligibility.age_max} years</div>
+                    </div>
+                  )}
+                  {scheme.eligibility.gender && scheme.eligibility.gender !== 'all' && (
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                      <CheckCircle className="text-green-500 mt-0.5 shrink-0" size={16} />
+                      <div>Gender: {scheme.eligibility.gender}</div>
+                    </div>
+                  )}
+                  {scheme.eligibility.note_en && (
+                    <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                      <FileText className="text-blue-500 mt-0.5 shrink-0" size={16} />
+                      <div>{scheme.eligibility.note_en}</div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Required Documents */}
+            {scheme.documents && scheme.documents.length > 0 && (
+              <section className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <FileText className="text-blue-600" size={20} />
+                  Required Documents
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {scheme.documents.map((doc, index) => (
+                    <div key={index} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                      <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${
+                        doc.required ? 'bg-red-500' : 'bg-yellow-500'
+                      }`} />
+                      <div>
+                        <div className="font-medium text-gray-900">{doc.label}</div>
+                        {doc.note_en && (
+                          <div className="text-sm text-gray-600">{doc.note_en}</div>
+                        )}
+                        <div className={`text-xs mt-1 ${
+                          doc.required ? 'text-red-600' : 'text-yellow-600'
+                        }`}>
+                          {doc.required ? 'Mandatory' : 'Optional'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Benefits */}
+            {scheme.benefits && (
+              <section className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  Benefits
+                </h2>
+                
+                <div className="space-y-2 text-sm text-gray-700">
+                  {scheme.benefits.one_time_grant && (
+                    <div>One-time grant: ₹{scheme.benefits.one_time_grant.toLocaleString('en-IN')}</div>
+                  )}
+                  {scheme.benefits.monthly_pension && (
+                    <div>Monthly pension: ₹{scheme.benefits.monthly_pension.toLocaleString('en-IN')}</div>
+                  )}
+                  {scheme.benefits.note_en && (
+                    <div className="mt-2 p-3 bg-blue-50 rounded-lg">{scheme.benefits.note_en}</div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Application Steps */}
+            {scheme.apply_at && scheme.apply_at.length > 0 && (
+              <section className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  How to Apply
+                </h2>
+                
+                <div className="space-y-3">
+                  {scheme.apply_at.map((step, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-medium shrink-0">
+                        {step.step}
+                      </div>
+                      <div className="text-gray-700">{step.office}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Eligibility Checker */}
+            <EligibilityChecker schemeId={scheme.scheme_id} />
+
+            {/* Related Schemes */}
+            <Suspense fallback={<RelatedSchemesSkeleton />}>
+              <RelatedSchemes currentSchemeId={scheme.scheme_id} />
+            </Suspense>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+async function RelatedSchemes({ currentSchemeId }: { currentSchemeId: string }) {
+  const data = await getRecommendations({ 
+    scheme_id: currentSchemeId, 
+    limit: 3 
+  })
+  
+  const relatedSchemes = data?.schemes?.filter(
+    (scheme: Scheme) => scheme.scheme_id !== currentSchemeId
+  ) || []
+
+  if (relatedSchemes.length === 0) {
+    return null
+  }
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        Related Schemes
+      </h3>
+      
+      <div className="space-y-4">
+        {relatedSchemes.map((scheme: Scheme) => (
+          <div key={scheme.scheme_id} className="border border-gray-100 rounded-lg p-3">
+            <a 
+              href={`/schemes/${scheme.scheme_id}`}
+              className="block hover:text-blue-600 transition-colors"
+            >
+              <div className="font-medium text-sm mb-1">{scheme.scheme_name}</div>
+              <div className="text-xs text-gray-600 line-clamp-2">
+                {scheme.scheme_name_bn || scheme.description}
+              </div>
+            </a>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function RelatedSchemesSkeleton() {
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="h-5 bg-gray-200 rounded w-32 mb-4 animate-pulse"></div>
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="border border-gray-100 rounded-lg p-3">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
+            <div className="h-3 bg-gray-200 rounded w-full animate-pulse"></div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }

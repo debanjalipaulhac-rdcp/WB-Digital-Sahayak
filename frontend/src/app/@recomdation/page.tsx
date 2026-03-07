@@ -1,24 +1,55 @@
+// PARALLEL ROUTE — SSR, no "use client"
+import { Suspense } from 'react'
 import { getRecommendations } from '@/lib/server/api'
 import SchemeCard from '@/components/SchemeCard'
-import { Sparkles } from 'lucide-react'
 
 export default async function RecommendationsSlot() {
-  const data = await getRecommendations().catch(() => null)
+  return (
+    <Suspense fallback={<RecommendationsSkeleton />}>
+      <RecommendationsContent />
+    </Suspense>
+  )
+}
+
+async function RecommendationsContent() {
+  const data = await getRecommendations({ limit: 6 })
   const schemes = data?.schemes || []
 
-  if (schemes.length === 0) return null
+  if (schemes.length === 0) {
+    return null
+  }
 
   return (
-    <section className="pt-7 px-5 max-w-6xl mx-auto">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles size={16} className="text-blue-600" />
-        <h2 className="text-base font-semibold text-blue-600 uppercase tracking-wide">
-          Recommended for You
+    <section className="pt-10 pb-5 px-5 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-bold text-gray-900 border-l-4 border-green-600 pl-3 leading-snug">
+          {data.personalised ? 'Recommended for You' : 'Popular Schemes'}
         </h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <div className="scheme-cards-scroll">
         {schemes.map((scheme) => (
           <SchemeCard key={scheme.scheme_id} scheme={scheme} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function RecommendationsSkeleton() {
+  return (
+    <section className="pt-10 pb-5 px-5 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-5">
+        <div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div>
+      </div>
+      <div className="scheme-cards-scroll">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/2 mb-3"></div>
+            <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+          </div>
         ))}
       </div>
     </section>
