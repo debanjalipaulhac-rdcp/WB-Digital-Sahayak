@@ -4,7 +4,7 @@ import { ArrowLeft, CheckCircle, FileText, Users } from 'lucide-react'
 import { getSchemeById, getRecommendations } from '@/lib/server/api'
 import type { Scheme } from '@/types'
 import SchemeCard from '@/components/SchemeCard'
-import EligibilityChecker from '@/components/EligibilityChecker'
+import { SchemeDetailActions } from '@/components/SchemeDetailActions'
 
 interface SchemePageProps {
   params: Promise<{ slug: string }>
@@ -36,44 +36,44 @@ export default async function SchemePage({ params }: SchemePageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <section className="bg-white border-b border-gray-200">
+      <section className="bg-muted/60 border-b ">
         <div className="max-w-4xl mx-auto px-5 py-6">
           <a 
             href="/schemes" 
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 mb-4"
+            className="inline-flex items-center gap-2 text-sm text-accent-foreground hover:text-blue-600 mb-4"
           >
             <ArrowLeft size={16} />
             Back to All Schemes
           </a>
           
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <FileText className="text-blue-600" size={24} />
+            <div className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center">
+              <FileText className="text-foreground" size={24} />
             </div>
             
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                <span className="px-2 py-1 bg-primary-foreground text-primary text-xs font-medium rounded">
                   {scheme.tag?.toUpperCase() || 'SCHEME'}
                 </span>
               </div>
               
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              <h1 className="text-2xl font-bold mb-2">
                 {scheme.scheme_name}
                 {scheme.scheme_name_bn && (
-                  <span className="block text-lg font-normal text-gray-600 mt-1">
+                  <span className="block text-lg font-normal text-muted-foreground/80 mt-1">
                     {scheme.scheme_name_bn}
                   </span>
                 )}
               </h1>
               
               {scheme.description && (
-                <p className="text-gray-600 mb-3">{scheme.description}</p>
+                <p className="text-muted-foreground/80 mb-3">{scheme.description}</p>
               )}
               
-              <div className="flex items-center gap-4 text-sm text-gray-500">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground/90">
                 {scheme.department && (
                   <div className="flex items-center gap-1">
                     <FileText size={14} />
@@ -99,27 +99,27 @@ export default async function SchemePage({ params }: SchemePageProps) {
             
             {/* Eligibility Rules */}
             {scheme.eligibility && (
-              <section className="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <section className="bg-card rounded-xl border p-6">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <CheckCircle className="text-green-600" size={20} />
                   Eligibility Criteria
                 </h2>
                 
-                <div className="space-y-3 text-sm text-gray-700">
+                <div className="space-y-3 text-sm">
                   {scheme.eligibility.age_min && scheme.eligibility.age_max && (
-                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg">
                       <CheckCircle className="text-green-500 mt-0.5 shrink-0" size={16} />
                       <div>Age: {scheme.eligibility.age_min} - {scheme.eligibility.age_max} years</div>
                     </div>
                   )}
                   {scheme.eligibility.gender && scheme.eligibility.gender !== 'all' && (
-                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg">
                       <CheckCircle className="text-green-500 mt-0.5 shrink-0" size={16} />
                       <div>Gender: {scheme.eligibility.gender}</div>
                     </div>
                   )}
                   {scheme.eligibility.note_en && (
-                    <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg">
                       <FileText className="text-blue-500 mt-0.5 shrink-0" size={16} />
                       <div>{scheme.eligibility.note_en}</div>
                     </div>
@@ -130,22 +130,22 @@ export default async function SchemePage({ params }: SchemePageProps) {
 
             {/* Required Documents */}
             {scheme.documents && scheme.documents.length > 0 && (
-              <section className="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <section className="bg-card rounded-xl border  p-6">
+                <h2 className="text-lg font-semibold  mb-4 flex items-center gap-2">
                   <FileText className="text-blue-600" size={20} />
                   Required Documents
                 </h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {scheme.documents.map((doc, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                    <div key={index} className="flex items-start gap-3 p-3  rounded-lg bg-secondary">
                       <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${
                         doc.required ? 'bg-red-500' : 'bg-yellow-500'
                       }`} />
                       <div>
-                        <div className="font-medium text-gray-900">{doc.label}</div>
+                        <div className="font-medium">{doc.label}</div>
                         {doc.note_en && (
-                          <div className="text-sm text-gray-600">{doc.note_en}</div>
+                          <div className="text-sm  text-muted-foreground">{doc.note_en}</div>
                         )}
                         <div className={`text-xs mt-1 ${
                           doc.required ? 'text-red-600' : 'text-yellow-600'
@@ -161,12 +161,12 @@ export default async function SchemePage({ params }: SchemePageProps) {
 
             {/* Benefits */}
             {scheme.benefits && (
-              <section className="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <section className="bg-card rounded-xl border p-6">
+                <h2 className="text-lg font-semibold mb-4">
                   Benefits
                 </h2>
                 
-                <div className="space-y-2 text-sm text-gray-700">
+                <div className="space-y-2 text-sm text-accent-foreground/80">
                   {scheme.benefits.one_time_grant && (
                     <div>One-time grant: ₹{scheme.benefits.one_time_grant.toLocaleString('en-IN')}</div>
                   )}
@@ -174,16 +174,22 @@ export default async function SchemePage({ params }: SchemePageProps) {
                     <div>Monthly pension: ₹{scheme.benefits.monthly_pension.toLocaleString('en-IN')}</div>
                   )}
                   {scheme.benefits.note_en && (
-                    <div className="mt-2 p-3 bg-blue-50 rounded-lg">{scheme.benefits.note_en}</div>
+                    <div className="mt-2 p-3 bg-secondary rounded-lg">{scheme.benefits.note_en}</div>
                   )}
                 </div>
               </section>
             )}
 
+            {/* Action Buttons */}
+            <SchemeDetailActions
+              schemeId={scheme.scheme_id}
+              schemeName={scheme.scheme_name}
+            />
+
             {/* Application Steps */}
             {scheme.apply_at && scheme.apply_at.length > 0 && (
-              <section className="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <section className="bg-card rounded-xl border p-6">
+                <h2 className="text-lg font-semibold mb-4">
                   How to Apply
                 </h2>
                 
@@ -193,7 +199,7 @@ export default async function SchemePage({ params }: SchemePageProps) {
                       <div className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-medium shrink-0">
                         {step.step}
                       </div>
-                      <div className="text-gray-700">{step.office}</div>
+                      <div className="text-accent-foreground">{step.office}</div>
                     </div>
                   ))}
                 </div>
@@ -203,9 +209,6 @@ export default async function SchemePage({ params }: SchemePageProps) {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Eligibility Checker */}
-            <EligibilityChecker schemeId={scheme.scheme_id} />
-
             {/* Related Schemes */}
             <Suspense fallback={<RelatedSchemesSkeleton />}>
               <RelatedSchemes currentSchemeId={scheme.scheme_id} />
@@ -232,14 +235,14 @@ async function RelatedSchemes({ currentSchemeId }: { currentSchemeId: string }) 
   }
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <section className="bg-card rounded-xl border p-6">
+      <h3 className="text-lg font-semibold mb-4">
         Related Schemes
       </h3>
       
       <div className="space-y-4">
         {relatedSchemes.map((scheme: Scheme) => (
-          <div key={scheme.scheme_id} className="border border-gray-100 rounded-lg p-3">
+          <div key={scheme.scheme_id} className="border rounded-lg p-3">
             <a 
               href={`/schemes/${scheme.scheme_id}`}
               className="block hover:text-blue-600 transition-colors"

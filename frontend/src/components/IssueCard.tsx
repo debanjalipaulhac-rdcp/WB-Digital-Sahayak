@@ -1,99 +1,98 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import ScriptCard from './ScriptCard'
+import type { EligibilityIssue, Lang } from '@/types'
 
-interface Props {
-    type?: 'warning' | 'fatal'
-    code?: string
-    message: string
-    messageBn?: string
-    action?: string
-    actionBn?: string
-    scriptBn?: string
-    scriptEn?: string
-    audioUrl?: string
+interface IssueCardProps {
+  issue: EligibilityIssue
+  lang?: Lang
+  onScriptRequest?: (scriptCode: string) => void
 }
 
-export default function IssueCard({ type = 'warning', code, message, messageBn, action, actionBn, scriptBn, scriptEn, audioUrl }: Props) {
-    const [expanded, setExpanded] = useState(false)
+export default function IssueCard({ issue, lang = 'en', onScriptRequest }: IssueCardProps) {
+  const isFatal = issue.type === 'fatal'
 
-    const isFatal = type === 'fatal'
+  const borderColor = isFatal ? '#EF4444' : '#F59E0B'
+  const bgColor = isFatal ? '#FFF5F5' : '#FFFBEB'
+  const icon = isFatal ? '⛔' : '⚠️'
 
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`relative rounded-xl overflow-hidden bg-slate-800/60 border border-slate-700/50 backdrop-blur-sm ${isFatal ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-amber-500'
-                }`}
-        >
-            <div className="p-4">
-                <div className="flex items-start gap-3">
-                    <div className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-lg ${isFatal ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
-                        }`}>
-                        {isFatal ? '⚠️' : '⚡'}
-                    </div>
+  // Format code: replace underscores with spaces and title case
+  const formatCode = (code: string) => {
+    return code
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
 
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isFatal ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
-                                }`}>
-                                {isFatal ? 'CRITICAL' : 'WARNING'}
-                            </span>
-                            {code && <span className="text-xs text-slate-500 font-mono">{code}</span>}
-                        </div>
-
-                        <p className="text-white font-semibold mt-1 text-sm leading-tight">{message}</p>
-                        {messageBn && (
-                            <p className="text-slate-400 text-sm mt-0.5 font-normal" style={{ fontFamily: "'Noto Sans Bengali', sans-serif" }}>
-                                {messageBn}
-                            </p>
-                        )}
-
-                        {action && (
-                            <div className="mt-2 text-xs text-slate-300 bg-slate-700/40 rounded-lg px-3 py-2">
-                                <span className="text-slate-500 font-medium">Action: </span>{action}
-                                {actionBn && (
-                                    <div className="text-slate-400 mt-0.5" style={{ fontFamily: "'Noto Sans Bengali', sans-serif" }}>
-                                        {actionBn}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {scriptBn && (
-                            <button
-                                onClick={() => setExpanded(!expanded)}
-                                className={`mt-3 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1.5 ${isFatal
-                                    ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
-                                    : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
-                                    }`}
-                            >
-                                <span>💬</span>
-                                {expanded ? 'Hide Script' : 'What to Say at Office'}
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <AnimatePresence>
-                    {expanded && scriptBn && (
-                        <motion.div
-                            key="script"
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="mt-3 pt-3 border-t border-slate-700/50">
-                                <ScriptCard bengaliText={scriptBn} englishText={scriptEn} audioUrl={audioUrl} />
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+  return (
+    <div
+      style={{
+        background: bgColor,
+        borderLeft: `4px solid ${borderColor}`,
+        borderRadius: 8,
+        padding: 14,
+        marginBottom: 12,
+      }}
+    >
+      {/* Row 1: Icon + Code + Badge */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <h4 style={{ fontSize: 14, fontWeight: 600, color: '#111827', margin: 0 }}>
+              {formatCode(issue.code)}
+            </h4>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '3px 8px',
+                borderRadius: 10,
+                background: isFatal ? '#FEE2E2' : '#FEF3C7',
+                border: `1px solid ${isFatal ? '#FECACA' : '#FDE68A'}`,
+                color: isFatal ? '#DC2626' : '#D97706',
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            >
+              -{issue.score_deduction} pts
             </div>
-        </motion.div>
-    )
+          </div>
+        </div>
+      </div>
+
+      {/* Row 2: Message */}
+      <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.5, marginBottom: 8, marginLeft: 30 }}>
+        {issue.message}
+      </div>
+
+      {/* Row 3: Script button */}
+      {issue.script_available && issue.script_code && onScriptRequest && (
+        <button
+          onClick={() => onScriptRequest(issue.script_code!)}
+          style={{
+            marginLeft: 30,
+            padding: '6px 12px',
+            borderRadius: 6,
+            background: 'transparent',
+            border: 'none',
+            color: '#2563EB',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.textDecoration = 'underline'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.textDecoration = 'none'
+          }}
+        >
+          Get help script →
+        </button>
+      )}
+    </div>
+  )
 }

@@ -19,9 +19,8 @@ export function ModalOrchestrator({ user }: Props) {
             {activeModal === 'auth' && (
                 <AuthModal isOpen onClose={closeModal} />
             )}
-            {activeModal === 'eligibility' && (
-                <EligibilityModal isOpen onClose={closeModal} user={user} />
-            )}
+            {/* EligibilityModal now uses Dialog and manages its own state via useUIStore */}
+            <EligibilityModal user={user} />
             {activeModal === 'voice' && (
                 <VoiceModal isOpen onClose={closeModal} />
             )}

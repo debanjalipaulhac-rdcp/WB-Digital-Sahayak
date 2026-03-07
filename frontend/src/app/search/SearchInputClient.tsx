@@ -18,13 +18,7 @@ export default function SearchInputClient({ defaultQuery = '' }: Props) {
     }
 
     return (
-        <div style={{
-            display: 'flex', alignItems: 'center', gap: 0,
-            background: '#fff', borderRadius: 12,
-            maxWidth: 580, margin: '0 auto',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            overflow: 'hidden',
-        }}>
+        <div className='shadow-foreground/30 overflow-hidden bg-muted text-foreground flex items-center m-auto max-w-3xl rounded-xl'>
             <Search size={18} color="#9CA3AF" style={{ flexShrink: 0, marginLeft: 16 }} />
             <input
                 type="text"

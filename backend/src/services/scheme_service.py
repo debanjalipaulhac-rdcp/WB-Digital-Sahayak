@@ -190,6 +190,7 @@ class SchemeService:
         scheme_id: Optional[str] = None,
         query: Optional[str] = None,
         limit: int = 6,
+        inline_profile: Optional[dict] = None,
     ) -> dict:
         profile = None
         if phone:
@@ -200,6 +201,14 @@ class SchemeService:
                 "schemes": SchemeService._profile_based(profile, exclude=scheme_id, limit=limit),
                 "mode": "profile",
                 "personalised": True,
+            }
+
+        # NEW: inline profile support for anonymous users
+        if inline_profile and inline_profile.get("age") and inline_profile.get("gender"):
+            return {
+                "schemes": SchemeService._profile_based(inline_profile, exclude=scheme_id, limit=limit),
+                "mode": "profile",
+                "personalised": False,
             }
 
         if scheme_id:

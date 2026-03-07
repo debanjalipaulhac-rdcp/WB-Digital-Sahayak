@@ -11,8 +11,10 @@ Usage:
   Lambda:     handler = main.handler  (set in Lambda config)
 """
 
+
+
+
 import logging
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -21,6 +23,7 @@ from src.channels.whatsapp import router as whatsapp_router
 from src.channels.auth_controller    import router as auth_router
 from src.channels.schemes_controller import router as schemes_router
 from src.channels.profile_controller import router as profile_router
+from src.channels.voice_controller import router as voice_router
 from src.config.secrets_loader import load_secrets
 
 load_secrets()
@@ -59,6 +62,7 @@ app.include_router(whatsapp_router, tags=["WhatsApp"])
 app.include_router(auth_router,    prefix="/api/v1")
 app.include_router(schemes_router, prefix="/api/v1")
 app.include_router(profile_router, prefix="/api/v1")
+app.include_router(voice_router, prefix="/api/v1")
 
 @app.get("/health")
 def health():

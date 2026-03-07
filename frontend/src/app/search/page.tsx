@@ -4,13 +4,14 @@ import SchemeCard from '@/components/SchemeCard'
 import { getSchemes } from '@/lib/server/api'
 import type { Scheme } from '@/types'
 import Link from 'next/link'
+import DepartMent from './DepartMent'
 
 export const metadata = {
     title: 'Search Schemes — WB Digital Sahayak',
 }
 
 const CATEGORIES = ['Education', 'Health', 'Women', 'Agriculture', 'Financial Aid', 'Scholarship']
-const DEPARTMENTS = ['Higher Education', 'Women & Child Dev.', 'Backward Classes', 'Health & Family Welfare']
+
 
 const PAGE_SIZE = 6
 
@@ -28,15 +29,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     const cookieStore = await cookies()
     void cookieStore
 
-    
-    const data = await getSchemes({ 
-        q: q || undefined, 
-        category: selectedCat || undefined 
+
+    const data = await getSchemes({
+        q: q || undefined,
+        category: selectedCat || undefined
     }).catch(() => null)
 
     let schemes: Scheme[] = data?.schemes || []
 
-    
+
     if (selectedDept) {
         const ld = selectedDept.toLowerCase()
         schemes = schemes.filter(s =>
@@ -50,7 +51,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     const paged = schemes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
     return (
-        <div className="min-h-screen bg-gray-50 px-5 py-6 pb-12">
+        <div className="min-h-screen bg-background px-5 py-6 pb-12">
             <div className="max-w-6xl mx-auto">
 
                 {/* Search input */}
@@ -58,7 +59,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
                 {/* Meta row */}
                 <div className="flex items-center justify-between mt-4 mb-6 flex-wrap gap-2.5">
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted-foreground">
                         {total > 0
                             ? `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total} results${q ? ` for "${q}"` : ''}`
                             : 'No schemes found'}
@@ -66,55 +67,44 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 </div>
 
                 {/* Two column: sidebar + results */}
-                <div className="detail-grid">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 
                     {/* Sidebar */}
                     <aside>
-                        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
-                            <div className="font-semibold text-sm text-gray-900 mb-3">Category</div>
+                        <div className="bg-muted/50 border  rounded-2xl p-5 mb-4">
+                            <div className="font-semibold text-sm text-foreground/70 mb-3">Category</div>
                             <Link
-                                    
-                                    href={`/search`}
-                                    className={`block px-2.5 py-1.5 rounded-lg text-sm mb-0.5 no-underline transition-colors ${selectedCat === ''
-                                        ? 'bg-blue-50 text-blue-600 font-semibold'
-                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                                        }`}
-                                >
-                                    All
-                                </Link>
+                                href={`/search`}
+                                className={`block px-2.5 py-1.5 rounded-lg text-sm mb-0.5 no-underline transition-colors ${selectedCat === ''
+                                    ? 'bg-primary-foreground text-primary font-semibold'
+                                    : 'text-gray-500 hover:bg-background/50 hover:text-accent'
+                                    }`}
+                            >
+                                All
+                            </Link>
                             {CATEGORIES.map(cat => (
                                 <Link
                                     key={cat}
                                     href={`/search?${q ? `q=${encodeURIComponent(q)}&` : ''}category=${encodeURIComponent(cat)}`}
                                     className={`block px-2.5 py-1.5 rounded-lg text-sm mb-0.5 no-underline transition-colors ${selectedCat === cat
-                                        ? 'bg-blue-50 text-blue-600 font-semibold'
+                                        ? 'bg-accent text-blue-600 font-semibold'
                                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
                                         }`}
                                 >
                                     {cat}
                                 </Link>
                             ))}
+                            <div className="bg-muted border rounded-2xl p-3 mt-4">
+                                <div className="font-semibold text-sm text-foreground/70 mb-3">Department</div>
+                                <DepartMent q={q} dept={selectedDept} />
+                            </div>
                         </div>
 
-                        <div className="bg-white border border-gray-200 rounded-2xl p-5">
-                            <div className="font-semibold text-sm text-gray-900 mb-3">Department</div>
-                            {DEPARTMENTS.map(dept => (
-                                <a
-                                    key={dept}
-                                    href={`/search?${q ? `q=${encodeURIComponent(q)}&` : ''}dept=${encodeURIComponent(dept)}`}
-                                    className={`block px-2.5 py-1.5 rounded-lg text-sm mb-0.5 no-underline transition-colors ${selectedDept === dept
-                                        ? 'bg-blue-50 text-blue-600 font-semibold'
-                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                                        }`}
-                                >
-                                    {dept}
-                                </a>
-                            ))}
-                        </div>
+
                     </aside>
 
                     {/* Results */}
-                    <main>
+                    <main className=' col-span-3'>
                         {paged.length === 0 ? (
                             <div className="text-center py-16">
                                 <div className="text-5xl mb-4">🔍</div>

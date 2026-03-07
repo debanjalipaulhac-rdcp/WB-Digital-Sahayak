@@ -6,6 +6,7 @@ import SchemeCard from '@/components/SchemeCard'
 import SearchBar, { EligibilityTrigger } from '@/components/SearchBar'
 import { getSchemes } from '@/lib/server/api'
 import Link from 'next/link'
+import { QuickEligibilityFilter } from '@/components/QuickEligibilityFilter'
 
 export const metadata = {
     title: 'WB Digital Sahayak — Find Your Welfare Benefits',
@@ -74,25 +75,9 @@ export default async function HomePage() {
                 </div>
             </section>
 
-            {/* ── RECOMMENDED BANNER ── */}
+            {/* ── FIND MY SCHEMES WIDGET ── */}
             <section className="pt-7 px-5 max-w-6xl mx-auto">
-                <div className="bg-accent border rounded-2xl p-6 flex items-center justify-between flex-wrap gap-5">
-                    <div className="flex-1 min-w-56">
-                        <div className="flex items-center gap-1.5 mb-2">
-                            <Sparkles size={14} className="text-blue-600" />
-                            <span className="text-xs font-semibold tracking-wide uppercase text-blue-600">
-                                {tx.recommended_label}
-                            </span>
-                        </div>
-                        <h2 className="text-lg sm:text-xl font-semibold mb-1.5 leading-snug">
-                            {tx.recommended_title}
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                            {tx.recommended_sub}
-                        </p>
-                    </div>
-                    <EligibilityTrigger />
-                </div>
+                <QuickEligibilityFilter />
             </section>
 
             {/* ── SCHEME CATEGORIES ── */}
@@ -114,21 +99,21 @@ export default async function HomePage() {
             </section>
 
             {/* ── STATS BAR ── */}
-            <section className="bg-white border-y border-gray-200 py-10 px-5 my-10">
-                <div className="max-w-4xl mx-auto grid grid-cols-4">
+            <section className="py-10 px-5">
+                <div className="max-w-2xl mx-auto grid gap-5 grid-cols-4">
                     {stats.map((stat, i) => (
                         <div
                             key={i}
-                            className={`animate-count text-center px-5 ${i < 3 ? 'border-r border-gray-200' : ''}`}
+                            className={`animate-count bg-secondary rounded-lg text-center p-5 ${i < 3 ? 'border-r' : ''}`}
                             style={{ animationDelay: `${i * 0.1}s` }}
                         >
-                            <div className="text-3xl sm:text-4xl font-bold text-blue-600">{stat}</div>
-                            <div className="text-xs text-gray-500 mt-1">{statLabels[i]}</div>
+                            <div className="text-3xl sm:text-4xl font-bold text-blue-600 text-center">{stat}</div>
+                            <div className="text-xs text-accent-foreground mt-1">{statLabels[i]}</div>
                         </div>
                     ))}
                 </div>
             </section>
-
+            <div className="h-8"/>
         </div>
     )
 }

@@ -8,6 +8,7 @@ import DarkModeToggle from './DarkModeToggle'
 import { useUIStore } from '@/stores/ui.store'
 import { useAuth } from '@/hooks/useAuth'
 import translations from '@/lib/i18n'
+import Link from 'next/link'
 
 interface NavLink {
     href: string
@@ -56,7 +57,7 @@ export default function Navbar({ lang = 'en', user }: NavbarProps) {
         }}>
 
             {/* Logo */}
-            <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit', flexShrink: 0 }}>
+            <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit', flexShrink: 0 }}>
                 <div style={{ width: 40, height: 40, background: 'var(--color-primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Landmark size={20} color="white" strokeWidth={2} />
                 </div>
@@ -66,12 +67,12 @@ export default function Navbar({ lang = 'en', user }: NavbarProps) {
                         Government of West Bengal
                     </div>
                 </div>
-            </a>
+            </Link>
 
             {/* Center nav links (desktop) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} className="nav-subtitle">
                 {NAV_LINKS.map(link => (
-                    <a key={link.href} href={link.href} style={{
+                    <Link key={link.href} href={link.href} style={{
                         padding: '6px 12px', borderRadius: 8,
                         fontSize: 14, fontWeight: 500,
                         textDecoration: 'none',
@@ -80,7 +81,7 @@ export default function Navbar({ lang = 'en', user }: NavbarProps) {
                         transition: 'all 0.15s',
                     }}>
                         {link.label}
-                    </a>
+                    </Link>
                 ))}
             </div>
 
@@ -111,20 +112,20 @@ export default function Navbar({ lang = 'en', user }: NavbarProps) {
                                 borderRadius: 12, boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
                                 overflow: 'hidden', zIndex: 200,
                             }}>
-                                <a href="/profile" onClick={() => setDropOpen(false)} style={{
+                                <Link href="/profile" onClick={() => setDropOpen(false)} style={{
                                     display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
                                     textDecoration: 'none', color: 'var(--color-text)', fontSize: 14, fontWeight: 500,
                                     borderBottom: '1px solid var(--color-border)',
                                 }}>
                                     <User size={16} color="var(--color-muted)" /> My Profile
-                                </a>
-                                <a href="/applications" onClick={() => setDropOpen(false)} style={{
+                                </Link>
+                                <Link href="/applications" onClick={() => setDropOpen(false)} style={{
                                     display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
                                     textDecoration: 'none', color: 'var(--color-text)', fontSize: 14, fontWeight: 500,
                                     borderBottom: '1px solid var(--color-border)',
                                 }}>
                                     <FileText size={16} color="var(--color-muted)" /> My Applications
-                                </a>
+                                </Link>
                                 <button onClick={handleLogout} style={{
                                     display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
                                     width: '100%', border: 'none', background: 'none', cursor: 'pointer',

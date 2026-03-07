@@ -1,86 +1,157 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import type { Band } from '@/types'
 
-const RADIUS = 90
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS
-
-function getBandColor(score: number) {
-    if (score >= 80) return { stroke: '#22c55e', text: 'text-green-400', ring: '#22c55e' }
-    if (score >= 50) return { stroke: '#f59e0b', text: 'text-amber-400', ring: '#f59e0b' }
-    return { stroke: '#ef4444', text: 'text-red-400', ring: '#ef4444' }
+interface ScoreMeterProps {
+  score: number
+  band: Band
+  band_label: string
+  band_label_bn?: string
+  animate?: boolean
 }
 
-interface Props {
-    score?: number
-    shouldAnimate?: boolean
-}
+export default function ScoreMeter({
+  score,
+  band,
+  band_label,
+  band_label_bn,
+  animate = true,
+}: ScoreMeterProps) {
+  const [displayScore, setDisplayScore] = useState(0)
+  const [dashOffset, setDashOffset] = useState(502.65)
 
-export default function ScoreMeter({ score = 0, shouldAnimate = true }: Props) {
-    const [displayScore, setDisplayScore] = useState(0)
-    const [animDone, setAnimDone] = useState(!shouldAnimate)
-    const colors = getBandColor(score)
+  const RADIUS = 80
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS // 502.65
 
-    const targetDashOffset = CIRCUMFERENCE - (score / 100) * CIRCUMFERENCE
+  // Band colors
+  const colors = {
+    RED: { stroke: '#EF4444', bg: '#FEE2E2', text: '#DC2626', border: '#FECACA' },
+    AMBER: { stroke: '#F59E0B', bg: '#FEF3C7', text: '#D97706', border: '#FDE68A' },
+    GREEN: { stroke: '#22C55E', bg: '#DCFCE7', text: '#16A34A', border: '#BBF7D0' },
+  }
 
-    useEffect(() => {
-        if (!shouldAnimate) {
-            setDisplayScore(score)
-            setAnimDone(true)
-            return
-        }
+  const color = colors[band]
 
-        const duration = 1500
-        const start = performance.now()
-        const tick = (now: number) => {
-            const elapsed = now - start
-            const progress = Math.min(elapsed / duration, 1)
-            const eased = 1 - Math.pow(1 - progress, 3)
-            setDisplayScore(Math.round(eased * score))
-            if (progress < 1) {
-                requestAnimationFrame(tick)
-            } else {
-                setDisplayScore(score)
-                setAnimDone(true)
-            }
-        }
+  useEffect(() => {
+    if (!animate) {
+      setDisplayScore(score)
+      setDashOffset(CIRCUMFERENCE - (score / 100) * CIRCUMFERENCE)
+      return
+    }
+
+    const duration = 1200
+    const start = performance.now()
+
+    const tick = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3) // ease-out cubic
+
+      const currentScore = Math.round(eased * score)
+      const currentOffset = CIRCUMFERENCE - (currentScore / 100) * CIRCUMFERENCE
+
+      setDisplayScore(currentScore)
+      setDashOffset(currentOffset)
+
+      if (progress < 1) {
         requestAnimationFrame(tick)
-    }, [score, shouldAnimate])
+      }
+    }
 
-    return (
-        <div className="flex flex-col items-center">
-            <div className="relative w-52 h-52">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 220 220">
-                    {/* Track */}
-                    <circle cx="110" cy="110" r={RADIUS} fill="none" stroke="#1e293b" strokeWidth="16" />
-                    {/* Animated progress */}
-                    <motion.circle
-                        cx="110" cy="110" r={RADIUS}
-                        fill="none" stroke={colors.stroke} strokeWidth="16"
-                        strokeLinecap="round"
-                        strokeDasharray={CIRCUMFERENCE}
-                        initial={{ strokeDashoffset: CIRCUMFERENCE }}
-                        animate={{ strokeDashoffset: targetDashOffset }}
-                        transition={{ duration: 1.5, ease: 'easeOut' }}
-                    />
-                    {/* Glow effect */}
-                    <motion.circle
-                        cx="110" cy="110" r={RADIUS}
-                        fill="none" stroke={colors.stroke} strokeWidth="4"
-                        strokeLinecap="round"
-                        strokeDasharray={CIRCUMFERENCE}
-                        initial={{ strokeDashoffset: CIRCUMFERENCE, opacity: 0.3 }}
-                        animate={{ strokeDashoffset: targetDashOffset, opacity: 0.15 }}
-                        transition={{ duration: 1.5, ease: 'easeOut' }}
-                        style={{ filter: `blur(6px)` }}
-                    />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className={`text-5xl font-black ${colors.text} tabular-nums`}>{displayScore}</span>
-                    <span className="text-slate-400 text-xs mt-1 font-medium tracking-widest uppercase">Score</span>
-                </div>
+    requestAnimationFrame(tick)
+  }, [score, animate, CIRCUMFERENCE])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      {/* SVG Circle Meter */}
+      <div style={{ position: 'relative', width: 180, height: 180 }}>
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          {/* Background track */}
+          <circle
+            cx="90"
+            cy="90"
+            r={RADIUS}
+            fill="none"
+            stroke="#E5E7EB"
+            strokeWidth="12"
+          />
+          {/* Animated arc */}
+          <circle
+            cx="90"
+            cy="90"
+            r={RADIUS}
+            fill="none"
+            stroke={color.stroke}
+            strokeWidth="12"
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={dashOffset}
+            transform="rotate(-90 90 90)"
+            style={{ transition: animate ? 'stroke-dashoffset 0.1s linear' : 'none' }}
+          />
+        </svg>
+
+        {/* Center text */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div style={{ fontSize: 48, fontWeight: 700, color: color.stroke, lineHeight: 1 }}>
+            {displayScore}
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#6B7280', marginTop: 4 }}>
+            {band_label}
+          </div>
+          {band_label_bn && (
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 400,
+                color: '#9CA3AF',
+                marginTop: 2,
+                fontFamily: "'Noto Sans Bengali', sans-serif",
+              }}
+            >
+              {band_label_bn}
             </div>
+          )}
         </div>
-    )
+      </div>
+
+      {/* Band badge pill */}
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '8px 16px',
+          borderRadius: 20,
+          background: color.bg,
+          border: `1px solid ${color.border}`,
+          color: color.text,
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        <span>{band === 'RED' ? '🔴' : band === 'AMBER' ? '🟡' : '🟢'}</span>
+        <span>{band_label}</span>
+        {band_label_bn && (
+          <>
+            <span style={{ color: color.border }}>•</span>
+            <span style={{ fontFamily: "'Noto Sans Bengali', sans-serif" }}>{band_label_bn}</span>
+          </>
+        )}
+      </div>
+    </div>
+  )
 }

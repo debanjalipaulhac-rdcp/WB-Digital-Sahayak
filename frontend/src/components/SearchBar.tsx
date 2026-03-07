@@ -5,6 +5,7 @@ import { Search, Mic } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import VoiceSearchModal from './VoiceSearchModal'
 import CheckEligibilityModal from './CheckEligibilityModal'
+import { Dialog } from './ui/dialog'
 
 interface SearchBarProps {
     defaultQuery?: string
@@ -32,7 +33,7 @@ export default function SearchBar({ defaultQuery = '', showEligibilityTrigger = 
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                   
+
                     className='text-black flex-1 px-2 focus:outline-none'
                 />
                 <button className="mic-btn" aria-label="Voice search" onClick={() => setVoiceOpen(true)}>
@@ -45,25 +46,16 @@ export default function SearchBar({ defaultQuery = '', showEligibilityTrigger = 
 
             <VoiceSearchModal isOpen={voiceOpen} onClose={() => setVoiceOpen(false)} />
             {showEligibilityTrigger && (
-                <CheckEligibilityModal isOpen={eligOpen} onClose={() => setEligOpen(false)} />
+                <CheckEligibilityModal />
             )}
         </>
     )
 }
 
 export function EligibilityTrigger() {
-    const [open, setOpen] = useState(false)
     return (
         <>
-            <a
-                href="#"
-                className="btn-primary"
-                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => { e.preventDefault(); setOpen(true) }}
-                style={{ padding: '12px 24px', fontSize: 14, gap: 6, flexShrink: 0, whiteSpace: 'nowrap' }}
-            >
-                Check Eligibility →
-            </a>
-            <CheckEligibilityModal isOpen={open} onClose={() => setOpen(false)} />
+            <CheckEligibilityModal />
         </>
     )
 }

@@ -2,14 +2,18 @@
 
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
+import type { ScriptResponse, Lang } from '@/types'
 
 interface Props {
-    bengaliText: string
-    englishText?: string
-    audioUrl?: string
+    script: ScriptResponse
+    lang?: Lang
+    onClose?: () => void
 }
 
-export default function ScriptCard({ bengaliText, englishText, audioUrl }: Props) {
+export default function ScriptCard({ script, lang = 'bn', onClose }: Props) {
+    const bengaliText = script.script
+    const englishText = script.script // Use same for now, API should provide translation
+    const audioUrl = script.audio_url || undefined
     const [copied, setCopied] = useState(false)
     const [playing, setPlaying] = useState(false)
     const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -69,8 +73,32 @@ export default function ScriptCard({ bengaliText, englishText, audioUrl }: Props
                     >
                         {copied ? '✓ Copied!' : '📋 Copy'}
                     </motion.button>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-700/60 text-slate-300 hover:bg-slate-600/60 transition-all"
+                        >
+                            ✕
+                        </button>
+                    )}
                 </div>
             </div>
+
+            {/* Where to go */}
+            {script.where && (
+                <div className="mb-3 text-xs text-slate-400">
+                    <span className="text-slate-500 font-semibold">Where: </span>
+                    {script.where}
+                </div>
+            )}
+
+            {/* Form name */}
+            {script.form && (
+                <div className="mb-3 text-xs text-slate-400">
+                    <span className="text-slate-500 font-semibold">Form: </span>
+                    {script.form}
+                </div>
+            )}
 
             {/* Bengali Script */}
             <div
@@ -81,7 +109,7 @@ export default function ScriptCard({ bengaliText, englishText, audioUrl }: Props
             </div>
 
             {/* English translation */}
-            {englishText && (
+            {englishText && englishText !== bengaliText && (
                 <div className="text-slate-400 text-xs italic border-t border-slate-700/50 pt-2 mt-2 leading-relaxed">
                     <span className="text-slate-500 font-semibold not-italic">English: </span>
                     {englishText}

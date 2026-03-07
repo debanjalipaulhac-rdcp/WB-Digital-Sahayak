@@ -934,8 +934,11 @@ class TestEligibility:
             })
         roadmap = r.json()["roadmap"]
         assert len(roadmap) > 0
-        assert "priority" in roadmap[0]
-        assert "action"   in roadmap[0]
+        assert "step" in roadmap[0]
+        assert "action" in roadmap[0]
+        assert "action_bn" in roadmap[0]
+        assert "location" in roadmap[0]
+        assert "done" in roadmap[0]
 
     def test_eligibility_scheme_not_found(self):
         """Unknown scheme_id → 404."""

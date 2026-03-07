@@ -214,13 +214,25 @@ def _check_documents(scheme: dict, checks: dict) -> tuple[list, int]:
         if required and doc_id in docs_missing:
             issues.append({
                 "type":     "missing_document",
+                "code":     f"MISSING_{doc_id.upper()}",
                 "severity": "FATAL",
                 "doc_id":   doc_id,
                 "label":    label,
                 "label_bn": label_bn,
                 "message":  f"{label} is required but missing.",
-                "deduction": deduct,
+                "message_bn": f"{label_bn} প্রয়োজন কিন্তু নেই।",
+                "score_deduction": deduct,
+                "script_available": False,
                 "where_to_get": doc.get("where_to_get_en", ""),
+                "display": {
+                    "field_a": doc_id,
+                    "label_a": label,
+                    "value_a": "Missing",
+                    "field_b": "required_status",
+                    "label_b": "Required Status",
+                    "value_b": "Required",
+                    "similarity_score": 0.0,
+                }
             })
             deduction += deduct
 
@@ -245,8 +257,20 @@ def _check_documents(scheme: dict, checks: dict) -> tuple[list, int]:
         # Only check if both names were provided
         if name_a and name_b:
             if field == "name" and name_a != name_b:
+                # Calculate similarity score using fuzzy matching
+                from rapidfuzz import fuzz
+                similarity = max(
+                    fuzz.ratio(name_a, name_b),
+                    fuzz.token_sort_ratio(name_a, name_b)
+                )
+                
+                # Get original (non-lowercased) values from checks
+                value_a = str(checks.get(f"{doc_a}_name", name_a)).strip()
+                value_b = str(checks.get(f"{doc_b.replace('_passbook', '')}_name", name_b)).strip()
+                
                 issues.append({
                     "type":      "name_mismatch",
+                    "code":      mismatch.get("script_code", "NAME_MISMATCH"),
                     "severity":  severity,
                     "check_id":  mismatch.get("check_id", ""),
                     "doc_a":     doc_a,
@@ -254,19 +278,40 @@ def _check_documents(scheme: dict, checks: dict) -> tuple[list, int]:
                     "message":   mismatch.get("message_en", f"Name mismatch between {doc_a} and {doc_b}"),
                     "message_bn": mismatch.get("message_bn", ""),
                     "script_code": mismatch.get("script_code", ""),
-                    "deduction": deduct,
+                    "script_available": True,
+                    "score_deduction": deduct,
+                    "display": {
+                        "field_a": f"{doc_a}_name",
+                        "label_a": mismatch.get("label_a", doc_a.replace("_", " ").title()),
+                        "value_a": value_a,
+                        "field_b": f"{doc_b}_name",
+                        "label_b": mismatch.get("label_b", doc_b.replace("_", " ").title()),
+                        "value_b": value_b,
+                        "similarity_score": float(similarity),
+                    }
                 })
                 deduction += deduct
 
         if field == "address" and not address_ok:
             issues.append({
                 "type":     "address_mismatch",
+                "code":     mismatch.get("script_code", "ADDRESS_MISMATCH"),
                 "severity": severity,
                 "check_id": mismatch.get("check_id", ""),
                 "message":  mismatch.get("message_en", "Address mismatch between documents"),
                 "message_bn": mismatch.get("message_bn", ""),
                 "script_code": mismatch.get("script_code", ""),
-                "deduction": deduct,
+                "script_available": True,
+                "score_deduction": deduct,
+                "display": {
+                    "field_a": "aadhaar_address",
+                    "label_a": "Aadhaar Address",
+                    "value_a": str(checks.get("aadhaar_address", "")),
+                    "field_b": "bank_address",
+                    "label_b": "Bank Address",
+                    "value_b": str(checks.get("bank_address", "")),
+                    "similarity_score": 0.0,
+                }
             })
             deduction += deduct
 
@@ -277,11 +322,22 @@ def _check_documents(scheme: dict, checks: dict) -> tuple[list, int]:
         deduct = bank.get("score_deduction_unlinked", 25)
         issues.append({
             "type":      "bank_unlinked",
+            "code":      bank.get("script_code_unlinked", "AADHAAR_UNLINKED"),
             "severity":  "FATAL",
             "message":   "Aadhaar is not linked to bank account. DBT will fail.",
             "message_bn": "ব্যাংক অ্যাকাউন্টের সাথে আধার লিংক নেই। DBT পাবেন না।",
             "script_code": bank.get("script_code_unlinked", "AADHAAR_UNLINKED"),
-            "deduction": deduct,
+            "script_available": True,
+            "score_deduction": deduct,
+            "display": {
+                "field_a": "aadhaar_bank_linked",
+                "label_a": "Aadhaar-Bank Link Status",
+                "value_a": "Not Linked",
+                "field_b": "required_status",
+                "label_b": "Required Status",
+                "value_b": "Must be Linked",
+                "similarity_score": 0.0,
+            }
         })
         deduction += deduct
 
@@ -291,11 +347,22 @@ def _check_documents(scheme: dict, checks: dict) -> tuple[list, int]:
             deduct = bank.get("score_deduction_dormant", 25)
             issues.append({
                 "type":     "dormant_account",
+                "code":     bank.get("script_code_dormant", "DORMANT_ACCOUNT"),
                 "severity": "FATAL",
                 "message":  f"Bank account dormant for {last_txn_months} months. Must be active.",
                 "message_bn": f"ব্যাংক অ্যাকাউন্ট {last_txn_months} মাস ধরে নিষ্ক্রিয়।",
                 "script_code": bank.get("script_code_dormant", "DORMANT_ACCOUNT"),
-                "deduction": deduct,
+                "script_available": True,
+                "score_deduction": deduct,
+                "display": {
+                    "field_a": "bank_last_transaction_months_ago",
+                    "label_a": "Last Transaction",
+                    "value_a": f"{last_txn_months} months ago",
+                    "field_b": "dormant_threshold",
+                    "label_b": "Maximum Allowed",
+                    "value_b": f"{threshold} months",
+                    "similarity_score": 0.0,
+                }
             })
             deduction += deduct
 
@@ -306,19 +373,23 @@ def _check_documents(scheme: dict, checks: dict) -> tuple[list, int]:
 # SCORING
 # ─────────────────────────────────────────────────────────────
 
-def _calculate_score(fatal_rules: list, doc_issues: list, doc_deduction: int) -> tuple[int, str]:
+def _calculate_score(fatal_rules: list, doc_issues: list, doc_deduction: int, eligible_basic: bool) -> tuple[int, str]:
     """
     Score from 100.
     Fatal profile rule failure → score = 0, band = RED.
     Doc issues deduct from score.
     Band: GREEN ≥80, AMBER 50-79, RED <50
+    
+    If eligible_basic is True, minimum score is 5 (for ScoreMeter animation).
+    If eligible_basic is False, score is always 0.
     """
-    # Fatal rule failure → immediately RED
+    # Fatal rule failure → immediately RED with score 0
     fatal_failures = [r for r in fatal_rules if r.get("fatal") and not r.get("passed")]
-    if fatal_failures:
+    if fatal_failures or not eligible_basic:
         return 0, "RED"
 
-    score = max(0, 100 - doc_deduction)
+    # Eligible users: minimum score is 5 to enable ScoreMeter animation
+    score = max(5, 100 - doc_deduction)
 
     if score >= 80:
         band = "GREEN"
@@ -330,70 +401,136 @@ def _calculate_score(fatal_rules: list, doc_issues: list, doc_deduction: int) ->
     return score, band
 
 
+def _get_band_labels(band: str) -> tuple[str, str]:
+    """Return English and Bengali labels for the band."""
+    labels = {
+        "GREEN": ("Ready to Apply", "আবেদনের জন্য প্রস্তুত"),
+        "AMBER": ("Almost Ready", "প্রায় প্রস্তুত"),
+        "RED": ("Not Ready", "প্রস্তুত নয়"),
+    }
+    return labels.get(band, ("Unknown", "অজানা"))
+
+
 # ─────────────────────────────────────────────────────────────
 # ROADMAP BUILDER
 # ─────────────────────────────────────────────────────────────
 
+# Bengali translations for roadmap actions
+ROADMAP_BN = {
+    "NAME_MISMATCH": "আপনার ব্যাংক শাখায় গিয়ে নাম সংশোধনের আবেদন করুন",
+    "DORMANT_ACCOUNT": "ছোট লেনদেনের মাধ্যমে অ্যাকাউন্ট সক্রিয় করুন",
+    "AADHAAR_UNLINKED": "ব্যাংক শাখায় আধার সংযোগ করুন",
+    "MISSING_VOTER_ID": "নির্বাচন অফিস থেকে ভোটার আইডি সংগ্রহ করুন",
+    "MISSING_BANK_PASSBOOK": "ব্যাংক শাখা থেকে পাসবুক নিন",
+    "MISSING_AADHAAR": "আধার সেবা কেন্দ্র থেকে আধার কার্ড নিন",
+    "MISSING_RATION_CARD": "রেশন অফিস থেকে রেশন কার্ড নিন",
+    "MISSING_CASTE_CERTIFICATE": "SDO অফিস থেকে জাতি শংসাপত্র নিন",
+    "ADDRESS_MISMATCH": "পঞ্চায়েত অফিসে ঠিকানা সংশোধন করুন",
+    "DOB_MISMATCH": "SDO অফিসে জন্ম তারিখ সংশোধন করুন",
+    "SUBMIT": "BDO অফিসে সম্পূর্ণ আবেদন জমা দিন",
+}
+
+# Location mapping for different issue types
+LOCATION_MAP = {
+    "NAME_MISMATCH": "Bank Branch",
+    "DORMANT_ACCOUNT": "Bank Branch",
+    "AADHAAR_UNLINKED": "Bank Branch",
+    "ADDRESS_MISMATCH": "Panchayat Office",
+    "DOB_MISMATCH": "SDO Office",
+}
+
 def _build_roadmap(scheme: dict, doc_issues: list, failed_rules: list) -> list:
     """
     Ordered action list the user must complete to become eligible/ready.
+    Returns list with step, action, action_bn, location, done fields.
     """
     steps = []
-    priority = 1
+    step_num = 1
 
     # Fatal rule failures first
     for rule in failed_rules:
         if rule.get("fatal"):
             steps.append({
-                "priority": priority,
-                "action":   "Fix eligibility issue",
-                "detail":   rule["message"],
-                "type":     "eligibility",
+                "step": step_num,
+                "action": f"Fix eligibility issue: {rule['message']}",
+                "action_bn": f"যোগ্যতার সমস্যা সমাধান করুন: {rule['message']}",
+                "location": "BDO Office",
+                "done": False,
             })
-            priority += 1
+            step_num += 1
 
     # Document issues
     for issue in doc_issues:
         if issue["type"] == "missing_document":
+            doc_id = issue.get("doc_id", "")
             where = issue.get("where_to_get", "")
+            action = f"Get {issue['label']}"
+            action_bn = ROADMAP_BN.get(f"MISSING_{doc_id.upper()}", f"{issue.get('label_bn', issue['label'])} সংগ্রহ করুন")
+            
+            # Extract location from where_to_get or use default
+            location = where.split(" or ")[0] if where else "BDO Office"
+            
             steps.append({
-                "priority": priority,
-                "action":   f"Get {issue['label']}",
-                "detail":   where or f"Obtain {issue['label']} from the relevant office.",
-                "type":     "document",
-                "doc_id":   issue["doc_id"],
+                "step": step_num,
+                "action": action,
+                "action_bn": action_bn,
+                "location": location,
+                "done": False,
             })
-            priority += 1
+            step_num += 1
 
         elif issue["type"] == "name_mismatch":
+            script_code = issue.get("script_code", "NAME_MISMATCH")
             steps.append({
-                "priority": priority,
-                "action":   "Fix name mismatch",
-                "detail":   issue["message"],
-                "type":     "mismatch",
-                "script_code": issue.get("script_code", ""),
+                "step": step_num,
+                "action": "Visit your bank branch to correct the name on your account",
+                "action_bn": ROADMAP_BN.get(script_code, "ব্যাংক শাখায় নাম সংশোধন করুন"),
+                "location": LOCATION_MAP.get(script_code, "Bank Branch"),
+                "done": False,
             })
-            priority += 1
+            step_num += 1
+
+        elif issue["type"] == "address_mismatch":
+            script_code = issue.get("script_code", "ADDRESS_MISMATCH")
+            steps.append({
+                "step": step_num,
+                "action": "Visit Panchayat office to correct address mismatch",
+                "action_bn": ROADMAP_BN.get(script_code, "পঞ্চায়েত অফিসে ঠিকানা সংশোধন করুন"),
+                "location": LOCATION_MAP.get(script_code, "Panchayat Office"),
+                "done": False,
+            })
+            step_num += 1
 
         elif issue["type"] == "bank_unlinked":
             steps.append({
-                "priority": priority,
-                "action":   "Link Aadhaar to bank account",
-                "detail":   "Visit your bank branch or nearest CSC to link Aadhaar.",
-                "type":     "bank",
-                "script_code": "AADHAAR_UNLINKED",
+                "step": step_num,
+                "action": "Link Aadhaar to your bank account at the bank branch",
+                "action_bn": ROADMAP_BN.get("AADHAAR_UNLINKED", "ব্যাংক শাখায় আধার লিঙ্ক করুন"),
+                "location": "Bank Branch",
+                "done": False,
             })
-            priority += 1
+            step_num += 1
 
         elif issue["type"] == "dormant_account":
             steps.append({
-                "priority": priority,
-                "action":   "Reactivate bank account",
-                "detail":   "Make a transaction or visit your bank to reactivate the dormant account.",
-                "type":     "bank",
-                "script_code": "DORMANT_ACCOUNT",
+                "step": step_num,
+                "action": "Activate your dormant bank account with a small transaction",
+                "action_bn": ROADMAP_BN.get("DORMANT_ACCOUNT", "ছোট লেনদেনের মাধ্যমে ঘুমন্ত ব্যাংক অ্যাকাউন্ট সক্রিয় করুন"),
+                "location": "Bank Branch",
+                "done": False,
             })
-            priority += 1
+            step_num += 1
+
+    # Final step: Submit application (always add if there are any steps)
+    if steps:
+        apply_office = scheme.get("apply_at", [{}])[0].get("office", "BDO Office")
+        steps.append({
+            "step": step_num,
+            "action": f"Submit completed application at {apply_office}",
+            "action_bn": ROADMAP_BN.get("SUBMIT", "BDO অফিসে সম্পূর্ণ আবেদন জমা দিন"),
+            "location": apply_office,
+            "done": False,
+        })
 
     return steps
 
@@ -413,11 +550,12 @@ def check_eligibility(scheme_id: str, profile: dict, checks: dict = None) -> dic
 
     Returns:
         {
-          scheme_id, scheme_name, eligible_basic,
-          score (0-100), band (RED/AMBER/GREEN),
+          scheme_id, scheme_name, scheme_name_bn, eligible_basic,
+          score (0-100), band (RED/AMBER/GREEN), band_label, band_label_bn,
+          benefit_amount,
           passed_rules, failed_rules,
-          doc_issues, roadmap,
-          benefit_info
+          issues (with display objects), roadmap (with action_bn, location, done),
+          benefit_info, score_breakdown
         }
     """
     if checks is None:
@@ -439,13 +577,28 @@ def check_eligibility(scheme_id: str, profile: dict, checks: dict = None) -> dic
     doc_issues, doc_deduction = _check_documents(scheme, checks)
 
     # Step 3 — Score + band
-    score, band = _calculate_score(failed_rules, doc_issues, doc_deduction)
+    score, band = _calculate_score(failed_rules, doc_issues, doc_deduction, eligible_basic)
+    band_label, band_label_bn = _get_band_labels(band)
 
     # Step 4 — Roadmap
     roadmap = _build_roadmap(scheme, doc_issues, failed_rules)
 
     # Step 5 — Benefit info (personalised by caste)
     benefit_info = _get_benefit_info(scheme, profile)
+    
+    # Extract single benefit_amount for frontend
+    benefit_amount = (
+        benefit_info.get("monthly_amount") or
+        benefit_info.get("one_time_grant") or
+        benefit_info.get("cashless_limit") or
+        None
+    )
+
+    # Step 6 — Score breakdown for frontend
+    score_breakdown = {}
+    for issue in doc_issues:
+        issue_code = issue.get("code", issue.get("type", "unknown"))
+        score_breakdown[issue_code] = -issue.get("score_deduction", 0)
 
     return {
         "scheme_id":      scheme_id,
@@ -454,12 +607,18 @@ def check_eligibility(scheme_id: str, profile: dict, checks: dict = None) -> dic
         "eligible_basic": eligible_basic,
         "score":          score,
         "band":           band,
+        "band_label":     band_label,
+        "band_label_bn":  band_label_bn,
+        "benefit_amount": benefit_amount,
         "passed_rules":   passed_rules,
         "failed_rules":   failed_rules,
-        "doc_issues":     doc_issues,
+        "issues":         doc_issues,  # Renamed from doc_issues for frontend
+        "doc_issues":     doc_issues,  # Keep for backward compatibility with tests
         "roadmap":        roadmap,
         "benefit_info":   benefit_info,
+        "score_breakdown": score_breakdown,
         "apply_at":       scheme.get("apply_at", []),
+        "warnings":       [],  # Empty list for now, can be populated with non-fatal issues
     }
 
 

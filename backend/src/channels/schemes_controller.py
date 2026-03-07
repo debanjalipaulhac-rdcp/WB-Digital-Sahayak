@@ -95,24 +95,44 @@ def recommendations(
     scheme_id: Optional[str] = Query(None, description="Current scheme (context-based)"),
     query:     Optional[str] = Query(None, description="Free-text query"),
     limit:     int           = Query(6, ge=1, le=12),
+    age:       Optional[int] = Query(None, description="User age for inline profile"),
+    gender:    Optional[str] = Query(None, description="User gender: male|female|other"),
+    caste:     Optional[str] = Query(None, description="User caste: general|obc|sc|st"),
+    has_daughter:    Optional[bool] = Query(None, description="Has daughter"),
+    has_school_child: Optional[bool] = Query(None, description="Has school-going child"),
     user: dict = Depends(get_optional_user),  # works for anonymous too
 ):
     """
-    3-mode recommendation engine:
+    4-mode recommendation engine:
       1. Profile-based if user is logged in and has a complete profile
-      2. Context-based if viewing a specific scheme (pass scheme_id)
-      3. Query-based if free text provided
-      4. Featured fallback (curated popular schemes, shuffled)
+      2. Profile-based if inline profile params provided (age/gender/caste)
+      3. Context-based if viewing a specific scheme (pass scheme_id)
+      4. Query-based if free text provided
+      5. Featured fallback (curated popular schemes, shuffled)
 
     No auth required — anonymous users get featured/query results.
     Logged-in users get personalised results based on saved profile.
+    Anonymous users can pass age/gender/caste for inline profile-based recommendations.
     """
     phone = user["sub"] if user else None
+    
+    # Build inline profile if any profile params provided
+    inline_profile = None
+    if age or gender or caste:
+        inline_profile = {
+            "age":             age,
+            "gender":          gender or "",
+            "caste":           caste or "",
+            "has_daughter":    has_daughter or False,
+            "has_school_child": has_school_child or False,
+        }
+    
     return SchemeService.get_recommendations(
         phone=phone,
         scheme_id=scheme_id,
         query=query,
         limit=limit,
+        inline_profile=inline_profile,
     )
 
 

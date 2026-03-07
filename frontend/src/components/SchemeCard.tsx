@@ -33,11 +33,11 @@ export default function SchemeCard({ scheme }: SchemeCardProps) {
     const tagCls = TAG_STYLES[tag] || TAG_STYLES['SCHEME']
 
     return (
-        <Link href={`/schemes/${id}`} className="bg-accent rounded-xl p-4 hover:-translate-0.5 transform-3d translate-0 transition-all">
+        <Link href={`/schemes/${id}`} className="bg-secondary rounded-xl p-4 hover:-translate-0.5 transform-3d translate-0 transition-all">
             {/* Top row: icon + tag */}
             <div className="flex items-start justify-between">
-                <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center shrink-0">
-                    <IconComponent size={24} className="text-blue-600" />
+                <div className="w-12 h-12 bg-primary-foreground rounded-md flex items-center justify-center shrink-0">
+                    <IconComponent size={24} className="text-primary" />
                 </div>
                 {tag && (
                     <span className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded ${tagCls}`}>
@@ -53,7 +53,7 @@ export default function SchemeCard({ scheme }: SchemeCardProps) {
 
             {/* Benefit pill */}
             {scheme.benefit_display && (
-                <div className="mt-1.5 text-xs font-semibold text-blue-700 bg-muted rounded px-2 py-0.5 w-fit">
+                <div className="mt-1.5 text-xs font-semibold text-primary bg-primary-foreground rounded px-2 py-0.5 w-fit">
                     {scheme.benefit_display}
                 </div>
             )}
@@ -64,8 +64,8 @@ export default function SchemeCard({ scheme }: SchemeCardProps) {
             </p>
 
             {/* Footer */}
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                <span className="text-[11px] text-primary-foreground leading-tight">{dept}</span>
+            <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                <span className="text-[11px] text-muted-foregroundleading-tight">{dept}</span>
                 <ExternalLink size={14} className="text-primary/60 group-hover:text-blue-700 transition-colors" />
             </div>
         </Link>

@@ -1,369 +1,748 @@
 'use client'
 
-import { useReducer, useEffect, useRef } from 'react'
+import { useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
-    X, ClipboardCheck, ArrowRight, Loader2, CheckCircle2,
-} from 'lucide-react'
-import { useEligibility } from '@/hooks/useEligibility'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import { useUIStore } from '@/stores/ui.store'
-import type { EligibilityResult } from '@/types'
+import { useEligibility } from '@/hooks/useEligibility'
+import  EligibilityResultPanel  from '@/components/EligibilityResultPanel'
+import ScriptCard from '@/components/ScriptCard'
+import type { ScriptResponse, Lang } from '@/types'
 
-interface EligibilityState {
-    step: number
-    age: string
-    gender: string
-    caste: string
-    district: string
-    is_govt_employee: boolean | null
-    pays_income_tax: boolean | null
-    income_bracket: string
-    has_daughter: boolean | null
-    has_school_child: boolean | null
-}
-
-type Action =
-    | { type: 'SET'; key: string; value: string | boolean | null }
-    | { type: 'NEXT' }
-    | { type: 'RESET' }
-
-const INITIAL: EligibilityState = {
-    step: 1, age: '', gender: '', caste: '',
-    district: '', is_govt_employee: null, pays_income_tax: null,
-    income_bracket: '', has_daughter: null, has_school_child: null,
-}
-
-function reducer(state: EligibilityState, action: Action): EligibilityState {
-    switch (action.type) {
-        case 'SET': return { ...state, [action.key]: action.value }
-        case 'NEXT': return { ...state, step: state.step + 1 }
-        case 'RESET': return INITIAL
-        default: return state
-    }
-}
-
-const WB_DISTRICTS = [
-    'Kolkata', 'North 24 Parganas', 'South 24 Parganas', 'Howrah', 'Hooghly',
-    'Bardhaman', 'Birbhum', 'Bankura', 'Purulia', 'Midnapore (East)',
-    'Midnapore (West)', 'Jhargram', 'Nadia', 'Murshidabad', 'Malda',
-    'North Dinajpur', 'South Dinajpur', 'Cooch Behar', 'Jalpaiguri',
-    'Darjeeling', 'Alipurduar', 'Kalimpong', 'Dakshin Dinajpur',
-]
-
-function ProgressBar({ step }: { step: number }) {
-    return (
-        <div style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 8px' }}>
-                Step {step} of 4
-            </p>
-            <div style={{ display: 'flex', gap: 4 }}>
-                {[1, 2, 3, 4].map(s => (
-                    <div key={s} className={`step-seg ${s < step ? 'done' : s === step ? 'current' : ''}`} />
-                ))}
-            </div>
-        </div>
-    )
-}
-
-function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
-    return (
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>
-            {children} {required && <span style={{ color: '#C81E1E' }}>*</span>}
-        </div>
-    )
-}
+/* ─── Types ─────────────────────────────────────────────────────────────── */
 
 interface Props {
-    isOpen: boolean
-    onClose: () => void
-    schemeId?: string
-    user?: { name: string | null; phone: string } | null
+  user?: { name: string | null; phone: string } | null
 }
 
-export default function CheckEligibilityModal({ isOpen, onClose, schemeId, user }: Props) {
-    const [state, dispatch] = useReducer(reducer, INITIAL)
-    const { check, result, loading: checking } = useEligibility()
-    const { eligibilitySchemeId } = useUIStore()
-    const firstRef = useRef<HTMLInputElement | null>(null)
-    const selectRef = useRef<HTMLSelectElement | null>(null)
+interface FormState {
+  // Step 1
+  age: string
+  gender: string
+  caste: string
+  // Step 2
+  is_govt_employee: boolean | null
+  pays_income_tax: boolean | null
+  has_daughter: boolean | null
+  has_school_child: boolean | null
+  district: string
+  // Step 3
+  aadhaar_name: string
+  bank_name: string
+  voter_name: string
+  aadhaar_bank_linked: boolean
+  // Step 4
+  bank_active: boolean | null
+  bank_last_transaction_months_ago: number
+  docs_present: string[]
+  docs_missing: string[]
+}
 
-    // Effective scheme: prop > store > fallback
-    const activeSchemeId = schemeId || eligibilitySchemeId || 'lakshmir_bhandar'
+const INITIAL_FORM: FormState = {
+  age: '',
+  gender: '',
+  caste: '',
+  is_govt_employee: null,
+  pays_income_tax: null,
+  has_daughter: null,
+  has_school_child: null,
+  district: '',
+  aadhaar_name: '',
+  bank_name: '',
+  voter_name: '',
+  aadhaar_bank_linked: false,
+  bank_active: null,
+  bank_last_transaction_months_ago: 0,
+  docs_present: ['aadhaar'],
+  docs_missing: ['voter_id', 'bank_passbook', 'ration_card'],
+}
 
-    useEffect(() => {
-        if (!isOpen) return
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
-        document.addEventListener('keydown', handler)
-        setTimeout(() => firstRef.current?.focus(), 100)
-        return () => document.removeEventListener('keydown', handler)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen])
+const ALL_DOCS = [
+  { id: 'aadhaar', label: 'Aadhaar Card' },
+  { id: 'voter_id', label: 'Voter ID Card' },
+  { id: 'bank_passbook', label: 'Bank Passbook' },
+  { id: 'ration_card', label: 'Ration Card' },
+  { id: 'income_certificate', label: 'Income Certificate' },
+  { id: 'age_proof', label: 'Age Proof (Birth Cert / Marksheet)' },
+]
 
-    function handleClose() {
-        dispatch({ type: 'RESET' }); onClose()
+/* ─── Validation ────────────────────────────────────────────────────────── */
+
+function isStepValid(step: number, form: FormState): boolean {
+  switch (step) {
+    case 1:
+      return (
+        form.age !== '' &&
+        Number(form.age) > 0 &&
+        Number(form.age) < 120 &&
+        form.gender !== '' &&
+        form.caste !== ''
+      )
+    case 2:
+      return (
+        form.is_govt_employee !== null &&
+        form.pays_income_tax !== null &&
+        form.district.trim().length > 1
+      )
+    case 3:
+      return form.aadhaar_name.trim().length > 1 && form.bank_name.trim().length > 1
+    case 4:
+      return form.bank_active !== null
+    default:
+      return true
+  }
+}
+
+/* ─── PillButton Component ──────────────────────────────────────────────── */
+
+function PillButton({
+  label,
+  emoji,
+  selected,
+  onClick,
+}: {
+  label: string
+  emoji?: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        padding: '12px 16px',
+        borderRadius: 12,
+        border: selected ? '2px solid #3B82F6' : '2px solid var(--border)',
+        background: selected ? '#EFF6FF' : 'var(--card)',
+        color: selected ? '#1D4ED8' : 'var(--foreground)',
+        cursor: 'pointer',
+        fontSize: 14,
+        fontWeight: selected ? 600 : 400,
+        minWidth: 80,
+        transition: 'all 0.15s ease',
+      }}
+    >
+      {emoji && <span style={{ fontSize: 22 }}>{emoji}</span>}
+      {label}
+    </button>
+  )
+}
+
+/* ─── Main Component ────────────────────────────────────────────────────── */
+
+export default function CheckEligibilityModal({ user }: Props) {
+  const [step, setStep] = useState(1)
+  const [form, setForm] = useState<FormState>(INITIAL_FORM)
+  const [scriptData, setScriptData] = useState<ScriptResponse | null>(null)
+
+  const { activeModal, closeModal, eligibilitySchemeId } = useUIStore()
+  const { check, fetchScript, result, loading } = useEligibility()
+
+  const set = (key: keyof FormState, val: unknown) =>
+    setForm((f) => ({ ...f, [key]: val }))
+
+  const toggle = (key: keyof FormState, val: boolean) => set(key, val)
+
+  const toggleDoc = (docId: string, present: boolean) => {
+    setForm((f) => ({
+      ...f,
+      docs_present: present
+        ? [...f.docs_present.filter((d) => d !== docId), docId]
+        : f.docs_present.filter((d) => d !== docId),
+      docs_missing: !present
+        ? [...f.docs_missing.filter((d) => d !== docId), docId]
+        : f.docs_missing.filter((d) => d !== docId),
+    }))
+  }
+
+  const handleNext = () => {
+    if (step < 4) {
+      setStep(step + 1)
+    }
+  }
+
+  const handleSubmit = async () => {
+    setStep(5)
+
+    const body = {
+      scheme_id: eligibilitySchemeId ?? 'lakshmir_bhandar',
+      profile: {
+        name: form.aadhaar_name,
+        age: Number(form.age),
+        gender: form.gender,
+        caste: form.caste,
+        district: form.district,
+        is_govt_employee: form.is_govt_employee ?? false,
+        pays_income_tax: form.pays_income_tax ?? false,
+        has_daughter: form.has_daughter ?? false,
+        has_school_child: form.has_school_child ?? false,
+      },
+      checks: {
+        aadhaar_name: form.aadhaar_name,
+        bank_name: form.bank_name,
+        voter_name: form.voter_name || undefined,
+        aadhaar_bank_linked: form.aadhaar_bank_linked,
+        bank_last_transaction_months_ago: form.bank_active
+          ? 0
+          : form.bank_last_transaction_months_ago || 7,
+        docs_present: form.docs_present,
+        docs_missing: form.docs_missing,
+      },
+      lang: 'bn' as Lang,
+      save: !!user,
     }
 
-    function set(key: string, value: string | boolean | null) { dispatch({ type: 'SET', key, value }) }
+    await check(body)
+  }
 
-    function canGoNext(): boolean {
-        if (state.step === 1) return !!(state.age && state.gender && state.caste)
-        if (state.step === 2) return !!(state.district && state.is_govt_employee !== null && state.pays_income_tax !== null)
-        if (state.step === 3) return !!(state.income_bracket && state.has_daughter !== null && state.has_school_child !== null)
-        return true
-    }
-
-    async function handleNext() {
-        if (state.step < 4) { dispatch({ type: 'NEXT' }); return }
-        const { step, ...profileData } = state
-        void step // consumed above
-        const data = await check({
-            scheme_id: activeSchemeId,
-            profile: profileData as Record<string, unknown>,
-            save: !!user,  // save to history only if authenticated
-        })
-        if (data) {
-            dispatch({ type: 'NEXT' })  // advance to results step
-        }
-    }
-
-    if (!isOpen) return null
-
-    const bandColor = result?.band === 'GREEN' ? '#059669' : result?.band === 'AMBER' ? '#D97706' : '#DC2626'
-
-    return (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && handleClose()}>
-            <div className="modal-box" style={{ maxWidth: 620 }}>
-
-                {/* Header */}
-                <div style={{ padding: '24px 28px 0', borderBottom: '1px solid var(--color-border)', paddingBottom: 16 }}>
-                    <button onClick={handleClose} style={{
-                        position: 'absolute', top: 16, right: 16,
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: '#9CA3AF', display: 'flex',
-                    }}>
-                        <X size={22} />
-                    </button>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                        <ClipboardCheck size={24} color="#F59E0B" />
-                        <h2 style={{ fontWeight: 700, fontSize: 20, margin: 0, color: 'var(--color-text)' }}>
-                            Check Eligibility
-                        </h2>
-                    </div>
-                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>
-                        Let&apos;s find schemes tailored for you.
-                    </p>
-                </div>
-
-                {/* Body */}
-                <div style={{ padding: '20px 28px' }}>
-                    <ProgressBar step={state.step} />
-
-                    {/* STEP 1 */}
-                    {state.step === 1 && (
-                        <div>
-                            <Label required>How old are you?</Label>
-                            <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #E5E7EB', borderRadius: 10, width: 200, overflow: 'hidden', marginBottom: 20 }}>
-                                <input
-                                    ref={firstRef}
-                                    type="number"
-                                    min={1} max={120}
-                                    placeholder="Enter age in years"
-                                    value={state.age}
-                                    onChange={e => set('age', e.target.value)}
-                                    style={{ flex: 1, border: 'none', outline: 'none', padding: '12px 14px', fontSize: 15, background: 'transparent', color: 'var(--color-text)' }}
-                                />
-                                <span style={{ padding: '12px 14px', color: '#9CA3AF', borderLeft: '1px solid #E5E7EB', fontSize: 13 }}>Years</span>
-                            </div>
-
-                            <Label required>Select Gender</Label>
-                            <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-                                {[
-                                    { val: 'male', label: 'Male', icon: '👨' },
-                                    { val: 'female', label: 'Female', icon: '👩' },
-                                    { val: 'other', label: 'Other', icon: '⚧' },
-                                ].map(({ val, label, icon }) => (
-                                    <button key={val} onClick={() => set('gender', val)}
-                                        className={`toggle-btn ${state.gender === val ? 'selected' : ''}`}>
-                                        <span style={{ fontSize: 28 }}>{icon}</span>
-                                        <span style={{ fontSize: 14, fontWeight: 500 }}>{label}</span>
-                                    </button>
-                                ))}
-                            </div>
-
-                            <Label required>Social Category</Label>
-                            <div style={{ display: 'flex', gap: 10 }}>
-                                {['General', 'OBC', 'SC', 'ST'].map(cat => (
-                                    <button key={cat} onClick={() => set('caste', cat)}
-                                        className={`toggle-chip ${state.caste === cat ? 'selected' : ''}`}>
-                                        {cat}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 2 */}
-                    {state.step === 2 && (
-                        <div>
-                            <Label required>Select District</Label>
-                            <select
-                                ref={selectRef}
-                                value={state.district}
-                                onChange={e => set('district', e.target.value)}
-                                style={{
-                                    width: '100%', border: '1.5px solid #E5E7EB', borderRadius: 10,
-                                    padding: '12px 14px', fontSize: 14, outline: 'none', marginBottom: 20,
-                                    background: 'var(--color-surface, #fff)', color: 'var(--color-text)', cursor: 'pointer',
-                                }}
-                            >
-                                <option value="">Select your district</option>
-                                {WB_DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
-                            </select>
-
-                            <Label required>Are you a Government Employee?</Label>
-                            <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-                                {['Yes', 'No'].map(opt => (
-                                    <button key={opt} onClick={() => set('is_govt_employee', opt === 'Yes')}
-                                        className={`toggle-chip ${state.is_govt_employee === (opt === 'Yes') ? 'selected' : ''}`}>
-                                        {opt}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <Label required>Do you pay Income Tax?</Label>
-                            <div style={{ display: 'flex', gap: 10 }}>
-                                {['Yes', 'No'].map(opt => (
-                                    <button key={opt} onClick={() => set('pays_income_tax', opt === 'Yes')}
-                                        className={`toggle-chip ${state.pays_income_tax === (opt === 'Yes') ? 'selected' : ''}`}>
-                                        {opt}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 3 */}
-                    {state.step === 3 && (
-                        <div>
-                            <Label required>Annual Family Income</Label>
-                            <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-                                {[
-                                    { val: 'below_1l', top: 'Below', bottom: '₹ 1 Lakh' },
-                                    { val: '1l_2.5l', top: 'Between', bottom: '₹1L - 2.5L' },
-                                    { val: '2.5l_5l', top: 'Between', bottom: '₹2.5L - 5L' },
-                                    { val: 'above_5l', top: 'Above', bottom: '₹ 5 Lakh' },
-                                ].map(({ val, top, bottom }) => (
-                                    <div key={val} onClick={() => set('income_bracket', val)}
-                                        className={`income-card ${state.income_bracket === val ? 'selected' : ''}`}>
-                                        <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>{top}</div>
-                                        <div style={{ fontSize: 14, fontWeight: 600 }}>{bottom}</div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <Label required>Do you have a daughter?</Label>
-                            <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-                                {['Yes', 'No'].map(opt => (
-                                    <button key={opt} onClick={() => set('has_daughter', opt === 'Yes')}
-                                        className={`toggle-chip ${state.has_daughter === (opt === 'Yes') ? 'selected' : ''}`}>
-                                        {opt}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <Label required>Do you have school-going children?</Label>
-                            <div style={{ display: 'flex', gap: 10 }}>
-                                {['Yes', 'No'].map(opt => (
-                                    <button key={opt} onClick={() => set('has_school_child', opt === 'Yes')}
-                                        className={`toggle-chip ${state.has_school_child === (opt === 'Yes') ? 'selected' : ''}`}>
-                                        {opt}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 4 */}
-                    {state.step === 4 && (
-                        <div style={{ textAlign: 'center' }}>
-                            {checking ? (
-                                <div style={{ padding: '40px 0' }}>
-                                    <Loader2 size={40} color="#1A56DB" style={{ animation: 'spin 1s linear infinite', marginBottom: 16 }} />
-                                    <p style={{ color: 'var(--color-muted)', fontSize: 15 }}>Checking your eligibility...</p>
-                                </div>
-                            ) : result ? (
-                                <div>
-                                    <svg viewBox="0 0 80 80" width={80} height={80} style={{ margin: '0 auto 12px', display: 'block' }}>
-                                        <circle cx={40} cy={40} r={34} fill="none" stroke="#F3F4F6" strokeWidth={8} />
-                                        <circle cx={40} cy={40} r={34} fill="none" stroke={bandColor} strokeWidth={8}
-                                            strokeDasharray={`${result.score * 2.14} 214`}
-                                            strokeLinecap="round" transform="rotate(-90 40 40)"
-                                        />
-                                        <text x={40} y={45} textAnchor="middle" fill={bandColor} fontSize={16} fontWeight={700}>
-                                            {result.score}%
-                                        </text>
-                                    </svg>
-
-                                    <div style={{ fontSize: 18, fontWeight: 700, color: bandColor, marginBottom: 8 }}>
-                                        {result.band_label}
-                                    </div>
-
-                                    {result.eligible_basic && (
-                                        <div style={{ color: '#057A55', fontSize: 14, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                            <CheckCircle2 size={18} />
-                                            You appear eligible for the schemes below!
-                                        </div>
-                                    )}
-
-                                    <div style={{ textAlign: 'left', marginBottom: 20 }}>
-                                        {(result.recommendations || []).map((s: import('@/types').Scheme) => (
-                                            <div key={s.scheme_id} style={{
-                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                padding: '10px 0', borderBottom: '1px solid var(--color-border)',
-                                            }}>
-                                                <span style={{ fontWeight: 500, fontSize: 14 }}>{s.scheme_name}</span>
-                                                <a href={`/scheme/${s.scheme_id}`} onClick={handleClose} style={{ color: '#1A56DB', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>
-                                                    View →
-                                                </a>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ padding: '24px 0' }}>
-                                    <p style={{ color: 'var(--color-muted)', fontSize: 14 }}>
-                                        Click &quot;Check Now&quot; to verify your eligibility based on your details.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="sticky-bottom">
-                    <button onClick={handleClose} style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: '#6B7280', fontSize: 14, fontWeight: 500, padding: '8px 16px',
-                    }}>
-                        Cancel
-                    </button>
-                    {!result && (
-                        <button
-                            onClick={handleNext}
-                            disabled={!canGoNext() || checking}
-                            style={{
-                                background: canGoNext() && !checking ? '#1A56DB' : '#93C5FD',
-                                color: '#fff', border: 'none', borderRadius: 10,
-                                padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: canGoNext() && !checking ? 'pointer' : 'not-allowed',
-                                display: 'flex', alignItems: 'center', gap: 6,
-                            }}
-                        >
-                            {state.step < 4 ? <>Next <ArrowRight size={16} /></> : checking ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Checking...</> : 'Check Now'}
-                        </button>
-                    )}
-                </div>
-            </div>
-            <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
-        </div>
+  const handleScript = async (scriptCode: string) => {
+    const mismatchIssue = result?.issues.find((i) => i.display?.field_a)
+    const data = await fetchScript(
+      scriptCode,
+      'bn',
+      mismatchIssue?.display?.field_a ?? '',
+      mismatchIssue?.display?.field_b ?? ''
     )
+    if (data) setScriptData(data)
+  }
+
+  const handleClose = () => {
+    closeModal()
+    setStep(1)
+    setForm(INITIAL_FORM)
+    setScriptData(null)
+  }
+
+  return (
+    <Dialog
+      open={activeModal === 'eligibility'}
+      onOpenChange={(o) => !o && handleClose()}
+    >
+      <DialogContent
+        className="max-w-lg w-full"
+        style={{ maxHeight: '90vh', overflowY: 'auto', padding: '0' }}
+      >
+        {/* Header */}
+        <DialogHeader style={{ padding: '24px 24px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <span style={{ fontSize: 22 }}>📋</span>
+            <DialogTitle style={{ fontSize: 20, fontWeight: 700 }}>
+              {step < 5 ? 'Check Eligibility' : 'Your Results'}
+            </DialogTitle>
+          </div>
+          {step < 5 && (
+            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0 }}>
+              Let&apos;s find schemes tailored for you.
+            </p>
+          )}
+        </DialogHeader>
+
+        {/* Progress bar */}
+        {step <= 4 && (
+          <div style={{ padding: '16px 24px 0' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginBottom: 6,
+              }}
+            >
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
+                Step {step} of 4
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
+                {Math.round((step / 4) * 100)}%
+              </span>
+            </div>
+            <Progress value={(step / 4) * 100} className="h-1.5" />
+          </div>
+        )}
+
+        {/* Step content */}
+        <div style={{ padding: '24px' }}>
+          {step === 1 && <Step1 form={form} set={set} />}
+          {step === 2 && <Step2 form={form} set={set} toggle={toggle} />}
+          {step === 3 && <Step3 form={form} set={set} toggle={toggle} />}
+          {step === 4 && <Step4 form={form} set={set} toggle={toggle} toggleDoc={toggleDoc} />}
+          {step === 5 &&
+            (loading ? (
+              <LoadingResult />
+            ) : result ? (
+              scriptData ? (
+                <ScriptCard
+                  script={scriptData}
+                  lang="bn"
+                  onClose={() => setScriptData(null)}
+                />
+              ) : (
+                <EligibilityResultPanel
+                  result={result}
+                  lang="bn"
+                  onScriptRequest={handleScript}
+                  onClose={handleClose}
+                />
+              )
+            ) : (
+              <ErrorResult onRetry={() => setStep(4)} />
+            ))}
+        </div>
+
+        {/* Footer nav */}
+        {step <= 4 && (
+          <div
+            style={{
+              padding: '16px 24px 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              borderTop: '1px solid var(--border)',
+              marginTop: 8,
+            }}
+          >
+            <Button
+              variant="ghost"
+              onClick={() => (step === 1 ? handleClose() : setStep((s) => s - 1))}
+            >
+              {step === 1 ? 'Cancel' : '← Back'}
+            </Button>
+            {step < 4 ? (
+              <Button onClick={handleNext} disabled={!isStepValid(step, form)}>
+                Next →
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={!isStepValid(4, form) || loading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {loading ? 'Checking...' : 'Check Eligibility →'}
+              </Button>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+
+/* ─── Step Components ───────────────────────────────────────────────────── */
+
+function Step1({ form, set }: { form: FormState; set: (key: keyof FormState, val: unknown) => void }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Age */}
+      <div>
+        <Label htmlFor="age" style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+          How old are you? <span style={{ color: '#EF4444' }}>*</span>
+        </Label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Input
+            id="age"
+            type="number"
+            min={1}
+            max={120}
+            value={form.age}
+            onChange={(e) => set('age', e.target.value)}
+            placeholder="Age"
+            style={{ maxWidth: 120 }}
+          />
+          <span style={{ color: 'var(--muted-foreground)', fontSize: 14 }}>Years</span>
+        </div>
+      </div>
+
+      {/* Gender */}
+      <div>
+        <Label style={{ fontWeight: 600, marginBottom: 12, display: 'block' }}>
+          Select Gender <span style={{ color: '#EF4444' }}>*</span>
+        </Label>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <PillButton
+            label="Male"
+            emoji="👨"
+            selected={form.gender === 'male'}
+            onClick={() => set('gender', 'male')}
+          />
+          <PillButton
+            label="Female"
+            emoji="👩"
+            selected={form.gender === 'female'}
+            onClick={() => set('gender', 'female')}
+          />
+          <PillButton
+            label="Other"
+            emoji="⚧"
+            selected={form.gender === 'other'}
+            onClick={() => set('gender', 'other')}
+          />
+        </div>
+      </div>
+
+      {/* Caste */}
+      <div>
+        <Label style={{ fontWeight: 600, marginBottom: 12, display: 'block' }}>
+          Social Category <span style={{ color: '#EF4444' }}>*</span>
+        </Label>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {['general', 'obc', 'sc', 'st'].map((c) => (
+            <PillButton
+              key={c}
+              label={c.toUpperCase()}
+              selected={form.caste === c}
+              onClick={() => set('caste', c)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Step2({
+  form,
+  set,
+  toggle,
+}: {
+  form: FormState
+  set: (key: keyof FormState, val: unknown) => void
+  toggle: (key: keyof FormState, val: boolean) => void
+}) {
+  const questions = [
+    { key: 'is_govt_employee' as keyof FormState, label: 'Are you a government employee?', required: true },
+    { key: 'pays_income_tax' as keyof FormState, label: 'Do you pay income tax?', required: true },
+    { key: 'has_daughter' as keyof FormState, label: 'Do you have an unmarried daughter?', required: false },
+    { key: 'has_school_child' as keyof FormState, label: 'Do you have a school-going child?', required: false },
+  ]
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {questions.map((q) => (
+        <div key={q.key}>
+          <Label style={{ fontWeight: 600, marginBottom: 10, display: 'block' }}>
+            {q.label}
+            {q.required && <span style={{ color: '#EF4444' }}> *</span>}
+            {!q.required && (
+              <span style={{ color: 'var(--muted-foreground)', fontSize: 12 }}> (optional)</span>
+            )}
+          </Label>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <PillButton
+              label="Yes"
+              emoji="✅"
+              selected={form[q.key] === true}
+              onClick={() => toggle(q.key, true)}
+            />
+            <PillButton
+              label="No"
+              emoji="❌"
+              selected={form[q.key] === false}
+              onClick={() => toggle(q.key, false)}
+            />
+          </div>
+        </div>
+      ))}
+
+      <div>
+        <Label htmlFor="district" style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+          Your District <span style={{ color: '#EF4444' }}>*</span>
+        </Label>
+        <Input
+          id="district"
+          value={form.district}
+          onChange={(e) => set('district', e.target.value)}
+          placeholder="e.g. Jalpaiguri, Bankura, Howrah"
+        />
+      </div>
+    </div>
+  )
+}
+
+function Step3({
+  form,
+  set,
+  toggle,
+}: {
+  form: FormState
+  set: (key: keyof FormState, val: unknown) => void
+  toggle: (key: keyof FormState, val: boolean) => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Warning banner */}
+      <div
+        style={{
+          background: '#FEF3C7',
+          border: '1px solid #FDE68A',
+          borderRadius: 8,
+          padding: '10px 14px',
+          display: 'flex',
+          gap: 8,
+          alignItems: 'flex-start',
+        }}
+      >
+        <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+        <div>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#92400E', margin: 0 }}>
+            Enter names EXACTLY as written on each document
+          </p>
+          <p style={{ fontSize: 12, color: '#78350F', margin: '4px 0 0' }}>
+            One letter difference = application rejected. Check spelling carefully.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <Label
+          htmlFor="aadhaar_name"
+          style={{ fontWeight: 600, marginBottom: 6, display: 'block' }}
+        >
+          Name on Aadhaar Card <span style={{ color: '#EF4444' }}>*</span>
+        </Label>
+        <Input
+          id="aadhaar_name"
+          value={form.aadhaar_name}
+          onChange={(e) => set('aadhaar_name', e.target.value)}
+          placeholder="Exactly as printed on Aadhaar"
+        />
+        <p style={{ fontSize: 11, color: 'var(--muted-foreground)', marginTop: 4 }}>
+          🪪 Check your Aadhaar card right now
+        </p>
+      </div>
+
+      <div>
+        <Label htmlFor="bank_name" style={{ fontWeight: 600, marginBottom: 6, display: 'block' }}>
+          Name on Bank Passbook / Card <span style={{ color: '#EF4444' }}>*</span>
+        </Label>
+        <Input
+          id="bank_name"
+          value={form.bank_name}
+          onChange={(e) => set('bank_name', e.target.value)}
+          placeholder="Exactly as printed on passbook"
+        />
+        <p style={{ fontSize: 11, color: 'var(--muted-foreground)', marginTop: 4 }}>
+          🏦 Open your bank passbook / check bank card
+        </p>
+      </div>
+
+      <div>
+        <Label htmlFor="voter_name" style={{ fontWeight: 600, marginBottom: 6, display: 'block' }}>
+          Name on Voter ID{' '}
+          <span style={{ color: 'var(--muted-foreground)', fontWeight: 400, fontSize: 12 }}>
+            (optional)
+          </span>
+        </Label>
+        <Input
+          id="voter_name"
+          value={form.voter_name}
+          onChange={(e) => set('voter_name', e.target.value)}
+          placeholder="Leave blank if not available"
+        />
+      </div>
+
+      <div>
+        <Label style={{ fontWeight: 600, marginBottom: 10, display: 'block' }}>
+          Is your Aadhaar linked to your bank account?
+        </Label>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <PillButton
+            label="Yes, linked"
+            emoji="🔗"
+            selected={form.aadhaar_bank_linked === true}
+            onClick={() => set('aadhaar_bank_linked', true)}
+          />
+          <PillButton
+            label="No, not linked"
+            emoji="❌"
+            selected={form.aadhaar_bank_linked === false}
+            onClick={() => set('aadhaar_bank_linked', false)}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Step4({
+  form,
+  set,
+  toggle,
+  toggleDoc,
+}: {
+  form: FormState
+  set: (key: keyof FormState, val: unknown) => void
+  toggle: (key: keyof FormState, val: boolean) => void
+  toggleDoc: (docId: string, present: boolean) => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div>
+        <Label style={{ fontWeight: 600, marginBottom: 10, display: 'block' }}>
+          Any bank transaction in the last 6 months? <span style={{ color: '#EF4444' }}>*</span>
+        </Label>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <PillButton
+            label="Yes, active"
+            emoji="✅"
+            selected={form.bank_active === true}
+            onClick={() => toggle('bank_active', true)}
+          />
+          <PillButton
+            label="No, dormant"
+            emoji="💤"
+            selected={form.bank_active === false}
+            onClick={() => toggle('bank_active', false)}
+          />
+        </div>
+      </div>
+
+      {form.bank_active === false && (
+        <div>
+          <Label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
+            Last transaction was approximately:
+          </Label>
+          <Select
+            value={String(form.bank_last_transaction_months_ago || '')}
+            onValueChange={(v) => set('bank_last_transaction_months_ago', Number(v))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select time period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">7–8 months ago</SelectItem>
+              <SelectItem value="10">10–12 months ago</SelectItem>
+              <SelectItem value="18">More than 1 year ago</SelectItem>
+              <SelectItem value="24">More than 2 years ago</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      <div>
+        <Label style={{ fontWeight: 600, marginBottom: 4, display: 'block' }}>
+          Which documents do you currently have?
+        </Label>
+        <p style={{ fontSize: 12, color: 'var(--muted-foreground)', marginBottom: 12 }}>
+          Check all that apply — unchecked = missing document
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {ALL_DOCS.map((doc) => {
+            const isPresent = form.docs_present.includes(doc.id)
+            return (
+              <label
+                key={doc.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: isPresent ? '1px solid #BBF7D0' : '1px solid var(--border)',
+                  background: isPresent ? '#F0FDF4' : 'var(--card)',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isPresent}
+                  onChange={(e) => toggleDoc(doc.id, e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#22C55E' }}
+                />
+                <span style={{ fontSize: 14 }}>{doc.label}</span>
+                {isPresent ? (
+                  <Badge
+                    variant="outline"
+                    style={{
+                      marginLeft: 'auto',
+                      color: '#16A34A',
+                      borderColor: '#BBF7D0',
+                      background: '#F0FDF4',
+                      fontSize: 11,
+                    }}
+                  >
+                    ✓ Have it
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    style={{
+                      marginLeft: 'auto',
+                      color: '#DC2626',
+                      borderColor: '#FECACA',
+                      background: '#FFF5F5',
+                      fontSize: 11,
+                    }}
+                  >
+                    ✗ Missing
+                  </Badge>
+                )}
+              </label>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LoadingResult() {
+  return (
+    <div style={{ textAlign: 'center', padding: '40px 0' }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+      <p style={{ fontSize: 16, fontWeight: 600 }}>Checking eligibility...</p>
+      <p style={{ fontSize: 13, color: 'var(--muted-foreground)', marginTop: 8 }}>
+        Comparing your documents with scheme requirements
+      </p>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 20 }}>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: '#3B82F6',
+              animation: `bounce 1.2s ${i * 0.2}s infinite`,
+            }}
+          />
+        ))}
+      </div>
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+          40% { transform: scale(1.2); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function ErrorResult({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '40px 0' }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+      <p style={{ fontSize: 16, fontWeight: 600 }}>Could not check eligibility</p>
+      <p style={{ fontSize: 13, color: 'var(--muted-foreground)', marginTop: 8 }}>
+        Please check your internet connection and try again.
+      </p>
+      <Button onClick={onRetry} style={{ marginTop: 20 }}>
+        ← Go back and retry
+      </Button>
+    </div>
+  )
 }

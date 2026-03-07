@@ -65,7 +65,7 @@ export default async function RootLayout({
                     {recommendations}
                 </main>
 
-                <footer className="bg-white border-t border-gray-200 px-5 py-6 flex items-center justify-between flex-wrap gap-3">
+                <footer className="bg-muted border-t px-5 py-6 flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -82,9 +82,9 @@ export default async function RootLayout({
                         </span>
                     </div>
                     <div className="flex gap-5">
-                        <a href="#" className="text-sm text-gray-500 hover:text-blue-600 transition-colors no-underline">Privacy Policy</a>
-                        <a href="#" className="text-sm text-gray-500 hover:text-blue-600 transition-colors no-underline">Terms of Service</a>
-                        <a href="#" className="text-sm text-gray-500 hover:text-blue-600 transition-colors no-underline">Help Center</a>
+                        <a href="#" className="text-sm text-foreground/70 hover:text-blue-600 transition-colors no-underline">Privacy Policy</a>
+                        <a href="#" className="text-sm text-foreground/70 hover:text-blue-600 transition-colors no-underline">Terms of Service</a>
+                        <a href="#" className="text-sm text-foreground/70 hover:text-blue-600 transition-colors no-underline">Help Center</a>
                     </div>
                 </footer>
 
