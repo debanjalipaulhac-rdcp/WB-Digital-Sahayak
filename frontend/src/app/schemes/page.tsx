@@ -23,8 +23,8 @@ interface SchemesPageProps {
 }
 
 export default async function SchemesPage({ searchParams }: SchemesPageProps) {
-    console.log(searchParams)
     const params = await searchParams
+    console.log(searchParams)
     const activeCategory = params.category || ''
     const q = params.q || ''
     const page = parseInt(params.page || '1', 10)
