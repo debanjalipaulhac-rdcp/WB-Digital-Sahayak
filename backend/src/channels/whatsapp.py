@@ -39,7 +39,7 @@ from src.storage.dynamo             import get_user, save_user, update_session_s
 # from src.engine.mismatch            import check_name_mismatch,generate_mismatch_script
 from src.cache.audio_cache          import resolve_chunks, fill_misses
 from src.router.guardrails          import validate_input
-from src.engine.eligibility         import check_eligibility, get_all_eligible_schemes
+from src.engine.eligibility         import check_eligibility
 from src.cache.tts_generator        import generate_for_misses
 from src.voice.chunk_splitter       import split_into_chunks
 from src.router.intent_router       import route, IntentType
@@ -320,6 +320,8 @@ def _eligibility_path(
     # Run eligibility check
     scheme_id = decision.scheme_id or "lakshmir_bhandar"
     result    = check_eligibility(scheme_id, profile)
+
+
     score_res = calculate_score(
         {"passed_rules": result.passed_rules, "failed_rules": result.failed_rules,
          "required_documents": result.required_documents},

@@ -1,183 +1,592 @@
 """
 src/engine/eligibility.py
-Deterministic eligibility check. Pure Python. Zero AI. Zero hallucination.
-Scheme IDs MUST match schemes.json exactly.
+==========================
+Deterministic eligibility engine. Zero AI. Pure rules.
+
+THREE modes (called from schemes_controller.py):
+
+  1. check_eligibility(scheme_id, profile, checks)
+     → Full check for ONE scheme: profile rules + document checks + mismatch
+     → Returns score (0-100), band, issues, roadmap
+
+  2. get_eligible_schemes(profile)
+     → Filter ALL schemes by profile rules
+     → Used by /recommendations when user has complete profile
+     → Returns list of matching scheme_ids
+
+  3. get_script(issue_code, lang, **kwargs)
+     → Returns "what to say at office" script for a specific issue
+
+PROFILE FIELDS:
+  age, gender, caste, district,
+  is_govt_employee, pays_income_tax,
+  family_income_annual, has_daughter,
+  has_school_child, is_enrolled_in_school,
+  is_unemployed
+
+DOCUMENT CHECK FIELDS:
+  aadhaar_name, bank_name, voter_name, ration_name
+  aadhaar_bank_linked, bank_last_transaction_months_ago
+  address_match_ok, docs_present, docs_missing
 """
 
-from dataclasses import dataclass
+import json
+import logging
+from pathlib import Path
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────
+# DATA LOADING
+# ─────────────────────────────────────────────────────────────
+
+def _load_schemes() -> list:
+    """
+    Load schemes from DynamoDB. Falls back to JSON.
+    NO module-level cache — keeps function patchable in tests.
+    (Per-request cost is negligible for ~10 schemes.)
+    """
+    # Try DynamoDB first
+    try:
+        from src.repository.dynamo_repo import SchemeRepository
+        schemes = SchemeRepository.get_all()
+        if schemes:
+            return schemes
+    except Exception as e:
+        logger.warning(f"DynamoDB unavailable, using JSON: {e}")
+
+    # Fallback: JSON
+    try:
+        json_path = Path(__file__).resolve().parents[2] / "src" / "data" / "schemes.json"
+        with open(json_path, "r", encoding="utf-8") as f:
+            return json.load(f).get("schemes", [])
+    except Exception as e:
+        logger.error(f"Cannot load schemes: {e}")
+        return []
 
 
-@dataclass
-class EligibilityResult:
-    eligible: bool
-    scheme_id: str
-    scheme_name: str
-    passed_rules: list     # ["Age: 38 ✓", "Gender: Female ✓"]
-    failed_rules: list     # ["Income: ₹1.8L exceeds ₹1.5L limit ✗"]
-    required_documents: list
+def get_all_schemes() -> list:
+    return _load_schemes()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SCHEME_RULES — MUST STAY IN SYNC WITH schemes.json
-# scheme_id keys must exactly match schemes.json "scheme_id" values
-# ─────────────────────────────────────────────────────────────────────────────
-SCHEME_RULES = {
+def get_scheme(scheme_id: str) -> Optional[dict]:
+    return next((s for s in _load_schemes() if s.get("scheme_id") == scheme_id), None)
 
-    "lakshmir_bhandar": {
-        "name": "Lakshmir Bhandar",
-        "rules": [
-            {"field": "gender",                           "operator": "eq",  "value": "female"},
-            {"field": "age",                              "operator": "between", "value": [25, 60]},
-            {"field": "is_govt_employee",                 "operator": "eq",  "value": False},
-            {"field": "is_income_tax_payer",              "operator": "eq",  "value": False},
-            {"field": "is_enrolled_in_other_cash_scheme", "operator": "eq",  "value": False},
-            {"field": "state",                            "operator": "eq",  "value": "west_bengal"},
-        ],
-        "documents": ["Aadhaar", "Voter ID", "Bank Passbook", "Ration Card"],
-        "benefit": "₹1,000–₹1,200/month DBT"
-    },
 
-    "swasthya_sathi": {
-        "name": "Swasthya Sathi",
-        "rules": [
-            {"field": "state", "operator": "eq", "value": "west_bengal"},
-        ],
-        "documents": ["Aadhaar", "Ration Card"],
-        "benefit": "₹5 lakh health cover/year"
-    },
+# ─────────────────────────────────────────────────────────────
+# PROFILE ELIGIBILITY RULES
+# ─────────────────────────────────────────────────────────────
 
-    "kanyashree": {
-        "name": "Kanyashree Prakalpa",
-        "rules": [
-            {"field": "gender",    "operator": "eq",      "value": "female"},
-            {"field": "age",       "operator": "between", "value": [13, 18]},
-            {"field": "is_student","operator": "eq",      "value": True},
-            {"field": "is_unmarried", "operator": "eq",   "value": True},
-            {"field": "state",     "operator": "eq",      "value": "west_bengal"},
-        ],
-        "documents": ["Aadhaar", "School Enrollment Certificate", "Birth Certificate", "Bank Passbook"],
-        "benefit": "₹1,000/year + ₹25,000 at 18"
-    },
+def _check_profile_rules(scheme: dict, profile: dict) -> tuple[list, list]:
+    """
+    Check profile against scheme eligibility rules.
+    Returns (passed_rules, failed_rules).
+    Each rule is a dict: {rule, passed, fatal, message}
+    """
+    el       = scheme.get("eligibility", {})
+    passed   = []
+    failed   = []
 
-    "rupashree": {
-        "name": "Rupashree Prakalpa",
-        "rules": [
-            {"field": "gender", "operator": "eq",      "value": "female"},
-            {"field": "age",    "operator": "between", "value": [18, 40]},
-            {"field": "income", "operator": "lte",     "value": 150000},
-            {"field": "state",  "operator": "eq",      "value": "west_bengal"},
-        ],
-        "documents": ["Aadhaar", "Age Proof", "Income Certificate", "Bank Passbook"],
-        "benefit": "₹25,000 one-time marriage grant"
-    },
+    age       = int(profile.get("age", 0))
+    gender    = str(profile.get("gender", "")).lower()
+    caste     = str(profile.get("caste", "general")).lower()
+    is_govt   = bool(profile.get("is_govt_employee", False))
+    pays_tax  = bool(profile.get("pays_income_tax", False))
+    family_income = int(profile.get("family_income_annual", 0))
+    has_daughter  = bool(profile.get("has_daughter", False))
+    is_student    = bool(profile.get("is_enrolled_in_school", False))
+    is_unemployed = bool(profile.get("is_unemployed", False))
 
-    # FIX: was "old_age_pension" — MUST be "samajik_suraksha" to match schemes.json
-    "samajik_suraksha": {
-        "name": "Samajik Suraksha Yojana",
-        "rules": [
-            {"field": "age",   "operator": "gte", "value": 60},
-            {"field": "state", "operator": "eq",  "value": "west_bengal"},
-        ],
-        "documents": ["Aadhaar", "Age Proof", "Bank Passbook"],
-        "benefit": "₹1,000/month pension"
-    },
+    def pass_rule(rule: str, msg: str):
+        passed.append({"rule": rule, "passed": True, "fatal": False, "message": msg})
 
-    "yuva_sathi": {
-        "name": "Yuva Sathi",
-        "rules": [
-            {"field": "age",          "operator": "between", "value": [18, 45]},
-            {"field": "is_unemployed","operator": "eq",      "value": True},
-            {"field": "state",        "operator": "eq",      "value": "west_bengal"},
-        ],
-        "documents": ["Aadhaar", "Employment Exchange Registration Card", "Educational Certificate", "Bank Passbook"],
-        "benefit": "₹1,500–₹2,000/month for max 2 years"
+    def fail_rule(rule: str, msg: str, fatal: bool = True):
+        failed.append({"rule": rule, "passed": False, "fatal": fatal, "message": msg})
+
+    # ── Gender ────────────────────────────────────────────────
+    req_gender = el.get("gender", "all")
+    if req_gender and req_gender not in ("all", "any", ""):
+        if gender and gender != req_gender.lower():
+            fail_rule("gender", f"Scheme is for {req_gender} only.", fatal=True)
+        else:
+            pass_rule("gender", f"Gender ({gender}) matches requirement.")
+    else:
+        pass_rule("gender", "No gender restriction.")
+
+    # ── Age ───────────────────────────────────────────────────
+    age_min = el.get("age_min") or 0
+    age_max = el.get("age_max") or 999
+
+    if age > 0:
+        if age < age_min:
+            fail_rule("age_min", f"Minimum age is {age_min}. You are {age}.", fatal=True)
+        elif age_max < 999 and age > age_max:
+            fail_rule("age_max", f"Maximum age is {age_max}. You are {age}.", fatal=True)
+        else:
+            pass_rule("age", f"Age {age} is within {age_min}–{age_max} range.")
+
+    # ── Government Employee ───────────────────────────────────
+    if el.get("not_govt_employee") and is_govt:
+        fail_rule("not_govt_employee", "Government employees are not eligible.", fatal=True)
+    elif el.get("not_govt_employee"):
+        pass_rule("not_govt_employee", "Not a government employee ✓")
+
+    # ── Income Tax ────────────────────────────────────────────
+    if el.get("not_income_tax_payer") and pays_tax:
+        fail_rule("not_income_tax", "Income tax payers are not eligible.", fatal=True)
+    elif el.get("not_income_tax_payer"):
+        pass_rule("not_income_tax", "Not an income tax payer ✓")
+
+    # ── Family Income Cap ─────────────────────────────────────
+    income_max = el.get("family_income_max")
+    if income_max and family_income > 0:
+        if family_income > income_max:
+            fail_rule(
+                "family_income",
+                f"Family income ₹{family_income:,} exceeds limit of ₹{income_max:,}.",
+                fatal=True
+            )
+        else:
+            pass_rule("family_income", f"Income ₹{family_income:,} is within ₹{income_max:,} limit.")
+
+    # ── Not enrolled in other cash scheme ─────────────────────
+    if el.get("not_enrolled_in_other_cash_scheme"):
+        enrolled = bool(profile.get("is_enrolled_in_other_cash_scheme", False))
+        if enrolled:
+            fail_rule("not_enrolled_other", "Cannot be enrolled in another cash transfer scheme.", fatal=True)
+        else:
+            pass_rule("not_enrolled_other", "Not enrolled in other cash scheme ✓")
+
+    # ── School enrollment (Kanyashree) ───────────────────────
+    if el.get("must_be_enrolled_in_school"):
+        if not is_student and not has_daughter:
+            fail_rule("school_enrollment", "Must be enrolled in school.", fatal=True)
+        else:
+            pass_rule("school_enrollment", "School enrollment confirmed ✓")
+
+    # ── Unmarried (Kanyashree K2) ─────────────────────────────
+    if el.get("must_be_unmarried"):
+        is_unmarried = bool(profile.get("is_unmarried", True))
+        if not is_unmarried:
+            fail_rule("unmarried", "Must be unmarried to qualify.", fatal=True)
+        else:
+            pass_rule("unmarried", "Unmarried status confirmed ✓")
+
+    # ── State resident ────────────────────────────────────────
+    if el.get("state_resident"):
+        pass_rule("state_resident", "West Bengal resident ✓")
+
+    return passed, failed
+
+
+# ─────────────────────────────────────────────────────────────
+# DOCUMENT CHECKS
+# ─────────────────────────────────────────────────────────────
+
+def _check_documents(scheme: dict, checks: dict) -> tuple[list, int]:
+    """
+    Check document availability and name mismatches.
+    Returns (issues_list, score_deduction).
+    """
+    issues    = []
+    deduction = 0
+
+    docs_present = set(checks.get("docs_present", []))
+    docs_missing = set(checks.get("docs_missing", []))
+
+    aadhaar_name  = str(checks.get("aadhaar_name", "")).strip().lower()
+    bank_name     = str(checks.get("bank_name", "")).strip().lower()
+    voter_name    = str(checks.get("voter_name", "")).strip().lower()
+    ration_name   = str(checks.get("ration_name", "")).strip().lower()
+    aadhaar_linked = bool(checks.get("aadhaar_bank_linked", True))
+    last_txn_months = int(checks.get("bank_last_transaction_months_ago", 0))
+    address_ok    = bool(checks.get("address_match_ok", True))
+
+    # ── Required document check ───────────────────────────────
+    for doc in scheme.get("documents", []):
+        doc_id   = doc.get("doc_id", "")
+        required = doc.get("required", False)
+        deduct   = doc.get("score_deduction_if_missing", 0)
+        label    = doc.get("label", doc_id)
+        label_bn = doc.get("label_bn", label)
+
+        if required and doc_id in docs_missing:
+            issues.append({
+                "type":     "missing_document",
+                "severity": "FATAL",
+                "doc_id":   doc_id,
+                "label":    label,
+                "label_bn": label_bn,
+                "message":  f"{label} is required but missing.",
+                "deduction": deduct,
+                "where_to_get": doc.get("where_to_get_en", ""),
+            })
+            deduction += deduct
+
+    # ── Name mismatch checks ──────────────────────────────────
+    name_map = {
+        "aadhaar":      aadhaar_name,
+        "bank_passbook": bank_name,
+        "voter_id":     voter_name,
+        "ration_card":  ration_name,
     }
+
+    for mismatch in scheme.get("mismatch_checks", []):
+        doc_a  = mismatch.get("doc_a", "")
+        doc_b  = mismatch.get("doc_b", "")
+        field  = mismatch.get("field", "name")
+        deduct = mismatch.get("score_deduction", 0)
+        severity = mismatch.get("severity", "WARNING")
+
+        name_a = name_map.get(doc_a, "")
+        name_b = name_map.get(doc_b, "")
+
+        # Only check if both names were provided
+        if name_a and name_b:
+            if field == "name" and name_a != name_b:
+                issues.append({
+                    "type":      "name_mismatch",
+                    "severity":  severity,
+                    "check_id":  mismatch.get("check_id", ""),
+                    "doc_a":     doc_a,
+                    "doc_b":     doc_b,
+                    "message":   mismatch.get("message_en", f"Name mismatch between {doc_a} and {doc_b}"),
+                    "message_bn": mismatch.get("message_bn", ""),
+                    "script_code": mismatch.get("script_code", ""),
+                    "deduction": deduct,
+                })
+                deduction += deduct
+
+        if field == "address" and not address_ok:
+            issues.append({
+                "type":     "address_mismatch",
+                "severity": severity,
+                "check_id": mismatch.get("check_id", ""),
+                "message":  mismatch.get("message_en", "Address mismatch between documents"),
+                "message_bn": mismatch.get("message_bn", ""),
+                "script_code": mismatch.get("script_code", ""),
+                "deduction": deduct,
+            })
+            deduction += deduct
+
+    # ── Bank conditions ───────────────────────────────────────
+    bank = scheme.get("bank_conditions", {})
+
+    if bank.get("aadhaar_linked_required") and not aadhaar_linked:
+        deduct = bank.get("score_deduction_unlinked", 25)
+        issues.append({
+            "type":      "bank_unlinked",
+            "severity":  "FATAL",
+            "message":   "Aadhaar is not linked to bank account. DBT will fail.",
+            "message_bn": "ব্যাংক অ্যাকাউন্টের সাথে আধার লিংক নেই। DBT পাবেন না।",
+            "script_code": bank.get("script_code_unlinked", "AADHAAR_UNLINKED"),
+            "deduction": deduct,
+        })
+        deduction += deduct
+
+    if bank.get("dormant_check"):
+        threshold = bank.get("dormant_threshold_months", 6)
+        if last_txn_months > threshold:
+            deduct = bank.get("score_deduction_dormant", 25)
+            issues.append({
+                "type":     "dormant_account",
+                "severity": "FATAL",
+                "message":  f"Bank account dormant for {last_txn_months} months. Must be active.",
+                "message_bn": f"ব্যাংক অ্যাকাউন্ট {last_txn_months} মাস ধরে নিষ্ক্রিয়।",
+                "script_code": bank.get("script_code_dormant", "DORMANT_ACCOUNT"),
+                "deduction": deduct,
+            })
+            deduction += deduct
+
+    return issues, deduction
+
+
+# ─────────────────────────────────────────────────────────────
+# SCORING
+# ─────────────────────────────────────────────────────────────
+
+def _calculate_score(fatal_rules: list, doc_issues: list, doc_deduction: int) -> tuple[int, str]:
+    """
+    Score from 100.
+    Fatal profile rule failure → score = 0, band = RED.
+    Doc issues deduct from score.
+    Band: GREEN ≥80, AMBER 50-79, RED <50
+    """
+    # Fatal rule failure → immediately RED
+    fatal_failures = [r for r in fatal_rules if r.get("fatal") and not r.get("passed")]
+    if fatal_failures:
+        return 0, "RED"
+
+    score = max(0, 100 - doc_deduction)
+
+    if score >= 80:
+        band = "GREEN"
+    elif score >= 50:
+        band = "AMBER"
+    else:
+        band = "RED"
+
+    return score, band
+
+
+# ─────────────────────────────────────────────────────────────
+# ROADMAP BUILDER
+# ─────────────────────────────────────────────────────────────
+
+def _build_roadmap(scheme: dict, doc_issues: list, failed_rules: list) -> list:
+    """
+    Ordered action list the user must complete to become eligible/ready.
+    """
+    steps = []
+    priority = 1
+
+    # Fatal rule failures first
+    for rule in failed_rules:
+        if rule.get("fatal"):
+            steps.append({
+                "priority": priority,
+                "action":   "Fix eligibility issue",
+                "detail":   rule["message"],
+                "type":     "eligibility",
+            })
+            priority += 1
+
+    # Document issues
+    for issue in doc_issues:
+        if issue["type"] == "missing_document":
+            where = issue.get("where_to_get", "")
+            steps.append({
+                "priority": priority,
+                "action":   f"Get {issue['label']}",
+                "detail":   where or f"Obtain {issue['label']} from the relevant office.",
+                "type":     "document",
+                "doc_id":   issue["doc_id"],
+            })
+            priority += 1
+
+        elif issue["type"] == "name_mismatch":
+            steps.append({
+                "priority": priority,
+                "action":   "Fix name mismatch",
+                "detail":   issue["message"],
+                "type":     "mismatch",
+                "script_code": issue.get("script_code", ""),
+            })
+            priority += 1
+
+        elif issue["type"] == "bank_unlinked":
+            steps.append({
+                "priority": priority,
+                "action":   "Link Aadhaar to bank account",
+                "detail":   "Visit your bank branch or nearest CSC to link Aadhaar.",
+                "type":     "bank",
+                "script_code": "AADHAAR_UNLINKED",
+            })
+            priority += 1
+
+        elif issue["type"] == "dormant_account":
+            steps.append({
+                "priority": priority,
+                "action":   "Reactivate bank account",
+                "detail":   "Make a transaction or visit your bank to reactivate the dormant account.",
+                "type":     "bank",
+                "script_code": "DORMANT_ACCOUNT",
+            })
+            priority += 1
+
+    return steps
+
+
+# ─────────────────────────────────────────────────────────────
+# PUBLIC API — check_eligibility
+# ─────────────────────────────────────────────────────────────
+
+def check_eligibility(scheme_id: str, profile: dict, checks: dict = None) -> dict:
+    """
+    Full eligibility check for ONE scheme.
+
+    Args:
+        scheme_id: e.g. "lakshmir_bhandar"
+        profile:   dict with age, gender, caste, is_govt_employee, etc.
+        checks:    dict with doc names, aadhaar_linked, dormant status, docs_present/missing
+
+    Returns:
+        {
+          scheme_id, scheme_name, eligible_basic,
+          score (0-100), band (RED/AMBER/GREEN),
+          passed_rules, failed_rules,
+          doc_issues, roadmap,
+          benefit_info
+        }
+    """
+    if checks is None:
+        checks = {}
+
+    scheme = get_scheme(scheme_id)
+    if not scheme:
+        return {"error": f"Scheme '{scheme_id}' not found."}
+
+    # Step 1 — Profile rules
+    passed_rules, failed_rules = _check_profile_rules(scheme, profile)
+
+    # Basic eligibility: no fatal failures
+    eligible_basic = not any(
+        r for r in failed_rules if r.get("fatal")
+    )
+
+    # Step 2 — Document checks (only meaningful if profile-eligible)
+    doc_issues, doc_deduction = _check_documents(scheme, checks)
+
+    # Step 3 — Score + band
+    score, band = _calculate_score(failed_rules, doc_issues, doc_deduction)
+
+    # Step 4 — Roadmap
+    roadmap = _build_roadmap(scheme, doc_issues, failed_rules)
+
+    # Step 5 — Benefit info (personalised by caste)
+    benefit_info = _get_benefit_info(scheme, profile)
+
+    return {
+        "scheme_id":      scheme_id,
+        "scheme_name":    scheme.get("scheme_name", ""),
+        "scheme_name_bn": scheme.get("scheme_name_bn", ""),
+        "eligible_basic": eligible_basic,
+        "score":          score,
+        "band":           band,
+        "passed_rules":   passed_rules,
+        "failed_rules":   failed_rules,
+        "doc_issues":     doc_issues,
+        "roadmap":        roadmap,
+        "benefit_info":   benefit_info,
+        "apply_at":       scheme.get("apply_at", []),
+    }
+
+
+def _get_benefit_info(scheme: dict, profile: dict) -> dict:
+    """Return personalised benefit amounts based on caste/profile."""
+    b     = scheme.get("benefits", {})
+    caste = str(profile.get("caste", "general")).lower()
+
+    info = {
+        "mode":    b.get("mode", ""),
+        "note_en": b.get("note_en", ""),
+        "note_bn": b.get("note_bn", ""),
+    }
+
+    # Monthly cash
+    if caste in ("sc", "st") and b.get("sc_st_monthly"):
+        info["monthly_amount"] = b["sc_st_monthly"]
+        info["amount_note"]    = "SC/ST rate"
+    elif b.get("general_monthly"):
+        info["monthly_amount"] = b["general_monthly"]
+        info["amount_note"]    = "General rate"
+    elif b.get("monthly_pension"):
+        info["monthly_amount"] = b["monthly_pension"]
+
+    # One-time
+    if b.get("one_time_grant"):
+        info["one_time_grant"] = b["one_time_grant"]
+
+    # Cashless limit
+    if b.get("cashless_limit"):
+        info["cashless_limit"] = b["cashless_limit"]
+
+    return info
+
+
+# ─────────────────────────────────────────────────────────────
+# PUBLIC API — get_eligible_schemes (for /recommendations)
+# ─────────────────────────────────────────────────────────────
+
+def get_eligible_schemes(profile: dict, limit: int = 10) -> list:
+    """
+    Filter all schemes by profile rules.
+    Returns list of {scheme_id, scheme_name, passed_rules, failed_rules}.
+    Used by recommendations engine for profile-based suggestions.
+    """
+    results = []
+
+    for scheme in get_all_schemes():
+        _, failed = _check_profile_rules(scheme, profile)
+        fatal_failures = [r for r in failed if r.get("fatal")]
+        if not fatal_failures:
+            results.append({
+                "scheme_id":      scheme.get("scheme_id"),
+                "scheme_name":    scheme.get("scheme_name"),
+                "scheme_name_bn": scheme.get("scheme_name_bn", ""),
+                "tag":            scheme.get("tag", ""),
+                "benefit_display": scheme.get("benefit_display", ""),
+                "department":     scheme.get("department", ""),
+            })
+        if len(results) >= limit:
+            break
+
+    return results
+
+
+# ─────────────────────────────────────────────────────────────
+# PUBLIC API — get_script
+# ─────────────────────────────────────────────────────────────
+
+_SCRIPTS = {
+    "NAME_MISMATCH": {
+        "en": "I want to correct the name spelling on my {doc_a}. "
+              "The name on my Aadhaar is '{aadhaar_name}' but on my {doc_b} it shows '{bank_name}'. "
+              "Please help me update this.",
+        "bn": "আমি আমার {doc_a}-এ নামের বানান ঠিক করতে চাই। "
+              "আমার আধার কার্ডে নাম '{aadhaar_name}' কিন্তু {doc_b}-এ '{bank_name}' লেখা আছে। "
+              "অনুগ্রহ করে এটি আপডেট করতে সাহায্য করুন।",
+    },
+    "AADHAAR_UNLINKED": {
+        "en": "I want to link my Aadhaar number to my bank account so I can receive government scheme benefits via DBT.",
+        "bn": "আমি সরকারি প্রকল্পের টাকা DBT-এর মাধ্যমে পেতে আমার আধার নম্বর ব্যাংক অ্যাকাউন্টের সাথে লিংক করতে চাই।",
+    },
+    "DORMANT_ACCOUNT": {
+        "en": "My bank account has been inactive. I want to reactivate it so I can receive government scheme benefits.",
+        "bn": "আমার ব্যাংক অ্যাকাউন্ট নিষ্ক্রিয় হয়ে গেছে। সরকারি সুবিধা পেতে এটি সক্রিয় করতে চাই।",
+    },
+    "DOB_MISMATCH": {
+        "en": "There is a date of birth discrepancy between my documents. "
+              "I want to correct this so my application is not rejected.",
+        "bn": "আমার কাগজপত্রে জন্ম তারিখে গরমিল আছে। আবেদন বাতিল না হওয়ার জন্য এটি ঠিক করতে চাই।",
+    },
+    "ADDRESS_MISMATCH": {
+        "en": "The address on my Ration Card does not match my Voter ID. "
+              "I want to update this to ensure my documents are consistent.",
+        "bn": "আমার রেশন কার্ডের ঠিকানা ভোটার কার্ডের সাথে মিলছে না। এটি সঠিক করতে চাই।",
+    },
 }
 
 
-def _evaluate_rule(rule: dict, user_profile: dict) -> tuple[bool, str]:
+def get_script(
+    issue_code: str,
+    lang: str = "bn",
+    aadhaar_name: str = "",
+    bank_name: str = "",
+    **kwargs,
+) -> Optional[dict]:
     """
-    Evaluates a single rule against user profile.
-    Returns (passed: bool, description: str)
+    Get the exact script to speak at a government office for a given issue.
+
+    Returns:
+        {issue_code, script, lang} or None if not found.
     """
-    field    = rule["field"]
-    operator = rule["operator"]
-    expected = rule["value"]
-    actual   = user_profile.get(field)
+    template = _SCRIPTS.get(issue_code.upper())
+    if not template:
+        return None
 
-    field_label = field.replace("_", " ").title()
-
-    if actual is None:
-        return False, f"{field_label}: Not provided ✗"
-
-    if operator == "eq":
-        passed = (actual == expected)
-        return (True,  f"{field_label}: {actual} ✓") if passed \
-          else (False, f"{field_label}: {actual} (expected {expected}) ✗")
-
-    elif operator == "between":
-        low, high = expected
-        passed = (low <= actual <= high)
-        return (True,  f"{field_label}: {actual} ✓") if passed \
-          else (False, f"{field_label}: {actual} (must be {low}–{high}) ✗")
-
-    elif operator == "gte":
-        passed = (actual >= expected)
-        return (True,  f"{field_label}: {actual} ✓") if passed \
-          else (False, f"{field_label}: {actual} (must be ≥ {expected}) ✗")
-
-    elif operator == "lte":
-        passed = (actual <= expected)
-        return (True,  f"{field_label}: {actual} ✓") if passed \
-          else (False, f"{field_label}: {actual} (must be ≤ {expected}) ✗")
-
-    return False, f"{field_label}: Unknown operator '{operator}' ✗"
-
-
-def check_eligibility(scheme_id: str, user_profile: dict) -> EligibilityResult:
-    """
-    Deterministic eligibility check.
-    user_profile keys:
-      age (int), gender (str), caste (str), income (int),
-      is_govt_employee (bool), is_income_tax_payer (bool),
-      is_enrolled_in_other_cash_scheme (bool), is_student (bool),
-      is_unemployed (bool), is_unmarried (bool), state (str)
-    """
-    if scheme_id not in SCHEME_RULES:
-        return EligibilityResult(
-            eligible=False,
-            scheme_id=scheme_id,
-            scheme_name="Unknown Scheme",
-            passed_rules=[],
-            failed_rules=[f"Scheme '{scheme_id}' not found ✗"],
-            required_documents=[]
-        )
-
-    scheme       = SCHEME_RULES[scheme_id]
-    passed_rules = []
-    failed_rules = []
-
-    for rule in scheme["rules"]:
-        passed, description = _evaluate_rule(rule, user_profile)
-        (passed_rules if passed else failed_rules).append(description)
-
-    return EligibilityResult(
-        eligible=len(failed_rules) == 0,
-        scheme_id=scheme_id,
-        scheme_name=scheme["name"],
-        passed_rules=passed_rules,
-        failed_rules=failed_rules,
-        required_documents=scheme["documents"]
+    text = template.get(lang) or template.get("en", "")
+    text = text.format(
+        aadhaar_name=aadhaar_name or "your name",
+        bank_name=bank_name or "the bank name",
+        doc_a="Aadhaar",
+        doc_b="Bank Passbook",
+        **{k: v for k, v in kwargs.items() if isinstance(v, str)},
     )
 
-
-def get_all_eligible_schemes(user_profile: dict) -> list[EligibilityResult]:
-    """
-    Runs check_eligibility for ALL scheme_ids.
-    Returns only those where eligible=True.
-    Used for "what schemes can I get?" query type.
-    """
-    return [
-        result for scheme_id in SCHEME_RULES
-        if (result := check_eligibility(scheme_id, user_profile)).eligible
-    ]
+    return {
+        "issue_code": issue_code,
+        "script":     text,
+        "lang":       lang,
+    }

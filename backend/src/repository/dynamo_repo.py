@@ -143,6 +143,96 @@ class UserRepository:
     def _tbl():
         return _get_table(settings.DYNAMO_TABLE_USERS)
 
+    # ── OTP ───────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def save_otp(phone: str, otp_hash: str, expires_at: int) -> bool:
+        try:
+            import time
+            UserRepository._tbl().put_item(Item={
+                "phone_number": phone,
+                "sk":           "OTP",
+                "otp_hash":     otp_hash,
+                "expires_at":   expires_at,
+                "attempts":     0,
+                "ttl":          expires_at + 60,
+            })
+            return True
+        except Exception as e:
+            logger.error(f"save_otp({phone}): {e}")
+            return False
+
+    @staticmethod
+    def get_otp_record(phone: str) -> Optional[dict]:
+        try:
+            resp = UserRepository._tbl().get_item(
+                Key={"phone_number": phone, "sk": "OTP"}
+            )
+            return resp.get("Item")
+        except Exception as e:
+            logger.error(f"get_otp_record({phone}): {e}")
+            return None
+
+    @staticmethod
+    def delete_otp(phone: str) -> None:
+        try:
+            UserRepository._tbl().delete_item(
+                Key={"phone_number": phone, "sk": "OTP"}
+            )
+        except Exception:
+            pass
+
+    @staticmethod
+    def increment_otp_attempts(phone: str) -> int:
+        try:
+            resp = UserRepository._tbl().update_item(
+                Key={"phone_number": phone, "sk": "OTP"},
+                UpdateExpression="SET attempts = attempts + :one",
+                ExpressionAttributeValues={":one": 1},
+                ReturnValues="UPDATED_NEW",
+            )
+            return int(resp["Attributes"].get("attempts", 0))
+        except Exception:
+            return 0
+
+    # ── Refresh Token ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    def save_refresh_token(phone: str, token_hash: str, expires_at: int) -> bool:
+        try:
+            UserRepository._tbl().put_item(Item={
+                "phone_number": phone,
+                "sk":           "REFRESH_TOKEN",
+                "token_hash":   token_hash,
+                "expires_at":   expires_at,
+                "ttl":          expires_at + 300,
+            })
+            return True
+        except Exception as e:
+            logger.error(f"save_refresh_token({phone}): {e}")
+            return False
+
+    @staticmethod
+    def get_refresh_token(phone: str) -> Optional[dict]:
+        try:
+            resp = UserRepository._tbl().get_item(
+                Key={"phone_number": phone, "sk": "REFRESH_TOKEN"}
+            )
+            return resp.get("Item")
+        except Exception:
+            return None
+
+    @staticmethod
+    def delete_refresh_token(phone: str) -> None:
+        try:
+            UserRepository._tbl().delete_item(
+                Key={"phone_number": phone, "sk": "REFRESH_TOKEN"}
+            )
+        except Exception:
+            pass
+
+    # ── Profile ───────────────────────────────────────────────────────────────
+
     @staticmethod
     def get_profile(phone: str) -> Optional[dict]:
         """
@@ -208,6 +298,27 @@ class UserRepository:
 
         except ClientError as e:
             logger.error(f"UserRepository.save_profile({phone}): {e}")
+
+    @staticmethod
+    def save_result(phone: str, result: dict) -> None:
+        """
+        Append an eligibility check result to the user's history.
+        Stored as JSON array in 'results' field (max 20 kept).
+        """
+        import json, time
+        try:
+            existing = UserRepository.get_results(phone, limit=100)
+            existing.append({**result, "checked_at": int(time.time())})
+            # Keep last 20 only
+            trimmed = existing[-20:]
+            UserRepository._tbl().update_item(
+                Key={"phone_number": phone},
+                UpdateExpression="SET #r = :r",
+                ExpressionAttributeNames={"#r": "results"},
+                ExpressionAttributeValues={":r": json.dumps(trimmed)},
+            )
+        except Exception as e:
+            logger.error(f"UserRepository.save_result({phone}): {e}")
 
     @staticmethod
     def get_results(phone: str, limit: int = 10) -> list:

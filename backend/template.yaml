@@ -5,8 +5,7 @@ Description: WB Digital Sahayak Backend
 Globals:
   Function:
     Timeout: 30
-    MemorySize: 512
-    Runtime: python3.13
+    MemorySize: 1024
     Environment:
       Variables:
         AWS_REGION_NAME: ap-south-1
@@ -24,22 +23,13 @@ Globals:
         CACHE_TTS: "true"
         PINECONE_REGION: ap-south-1
         PINECONE_CLOUD: aws
+        SECRETS_NAME: sahayak/secrets
 
 Resources:
-
   BackendFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
-      Handler: main.handler
-      Layers:
-        - arn:aws:lambda:ap-south-1:445567096027:layer:ffmpeg_layer:1
-      Environment:
-        Variables:
-          SARVAM_API_KEY: "{{resolve:secretsmanager:sahayak/secrets:SecretString:SARVAM_API_KEY}}"
-          TWILIO_ACCOUNT_SID: "{{resolve:secretsmanager:sahayak/secrets:SecretString:TWILIO_ACCOUNT_SID}}"
-          TWILIO_AUTH_TOKEN: "{{resolve:secretsmanager:sahayak/secrets:SecretString:TWILIO_AUTH_TOKEN}}"
-          PINECONE_API_KEY: "{{resolve:secretsmanager:sahayak/secrets:SecretString:PINECONE_API_KEY}}"
+      PackageType: Image
       Policies:
         - DynamoDBCrudPolicy:
             TableName: wb_sahayak_users
@@ -71,7 +61,10 @@ Resources:
           Properties:
             Path: /
             Method: ANY
-
+    Metadata:
+      DockerTag: latest
+      DockerContext: .
+      Dockerfile: Dockerfile
 
 Outputs:
   ApiUrl:

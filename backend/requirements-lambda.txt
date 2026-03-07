@@ -1,0 +1,12 @@
+fastapi
+mangum
+pydantic
+pydantic-settings
+python-dotenv
+python-multipart
+PyJWT
+starlette
+anyio
+uvicorn
+orjson
+rapidfuzz

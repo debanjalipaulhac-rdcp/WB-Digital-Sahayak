@@ -1,0 +1,43 @@
+# Virtual environment - NEVER include this
+backend/
+Scripts/
+Lib/
+Include/
+pyvenv.cfg
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# AWS SAM build artifacts
+.aws-sam/
+samconfig.toml
+
+# Secrets - NEVER include
+.env
+*.env
+secrets.json
+
+# Dev/test files
+tests/
+*.md
+.git/
+.gitignore
+
+# Layers folder - ffmpeg handled inside Docker
+layers/
+
+# Windows artifacts
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/

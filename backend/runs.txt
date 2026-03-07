@@ -78,3 +78,44 @@ Changeset created successfully. arn:aws:cloudformation:ap-south-1:445567096027:c
 
 Previewing CloudFormation changeset before deployment
 ======================================================
+Deploy this changeset? [y/N]: y
+
+
+aws cloudformation describe-stack-events `--stack-name wb-digital-sahayak `--region ap-south-1 `--query "StackEvents[?ResourceStatus=='CREATE_FAILED'].ResourceStatusReason" `--output text
+
+
+aws cloudformation describe-stack-events `--stack-name aws-sam-cli-managed-default `--region ap-south-1 `--query "StackEvents[?ResourceStatus=='CREATE_FAILED'].ResourceStatusReason" `--output text
+
+
+aws cloudformation describe-stack-events `--stack-name wb-digital-sahayak `--region ap-south-1 `--query "StackEvents[?ResourceStatus=='CREATE_FAILED'].ResourceStatusReason" `--output text
+
+aws cloudformation delete-stack `--stack-name wb-digital-sahayak `--region ap-south-1
+
+aws cloudformation describe-stacks `--stack-name wb-digital-sahayak `--region ap-south-1
+
+
+aws cloudformation delete-stack `--stack-name wb-digital-sahayak-65bc50b9-CompanionStack `--region ap-south-1
+
+
+aws cloudformation list-stacks `--region ap-south-1 `--query "StackSummaries[?StackStatus!='DELETE_COMPLETE'].{Name:StackName,Status:StackStatus}" `--output table
+
+
+
+aws cloudformation describe-stack-events `--stack-name wb-digital-sahayak `--region ap-south-1 `--query "StackEvents[?ResourceStatus=='CREATE_FAILED'].ResourceStatusReason" `--output text
+
+aws cloudformation describe-stack-events `--stack-name wb-digital-sahayak `--region ap-south-1 `--query "StackEvents[?ResourceStatus=='CREATE_FAILED' || ResourceStatus=='ROLLBACK_IN_PROGRESS'].{Resource:LogicalResourceId,Reason:ResourceStatusReason}" `--output table
+
+
+aws cloudformation delete-stack `--stack-name wb-digital-sahayak-65bc50b9-CompanionStack `--region ap-south-1
+
+aws cloudformation wait stack-delete-complete `--stack-name wb-digital-sahayak-65bc50b9-CompanionStack `--region ap-south-1
+
+
+aws cloudformation describe-stack-events `--stack-name wb-digital-sahayak `--region ap-south-1 `--query "StackEvents[?ResourceStatus=='CREATE_FAILED'].{Resource:LogicalResourceId,Reason:ResourceStatusReason}" `--output table
+
+
+aws cloudformation describe-stack-events `--stack-name wb-digital-sahayak `--region ap-south-1 `--query "StackEvents[?ResourceStatus=='CREATE_FAILED' || ResourceStatus=='UPDATE_FAILED'].{Resource:LogicalResourceId,Reason:ResourceStatusReason}" `--output table
+
+
+
+

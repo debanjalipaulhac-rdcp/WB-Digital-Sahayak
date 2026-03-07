@@ -80,10 +80,10 @@ def _scheme_card(s: dict) -> dict:
         "description":    description,               # derived
         "icon":           TAG_ICON_MAP.get(tag, TAG_ICON_MAP["DEFAULT"]),
         "accent_color":   TAG_COLOR_MAP.get(tag, TAG_COLOR_MAP["DEFAULT"]),
-        # "eligibility":    s.get("eligibility", {}),
-        # "documents":      s.get("documents", []),
-        # "apply_at":       s.get("apply_at", []),
-        # "benefits":       benefits,
+        "eligibility":    s.get("eligibility", {}),
+        "documents":      s.get("documents", []),
+        "apply_at":       s.get("apply_at", []),
+        "benefits":       benefits,
     }
 
 
@@ -100,9 +100,9 @@ class SchemeService:
         sort: str = "relevance",
     ) -> dict:
         result = SchemeRepository.search(query, category, page, page_size)
-        category=category.upper()
-        # if not result["schemes"]:
-        #     result = SchemeService._search_from_json(query, category, page, page_size)
+
+        if not result["schemes"]:
+            result = SchemeService._search_from_json(query, category, page, page_size)
 
         schemes = [_scheme_card(s) for s in result["schemes"]]
 
@@ -153,10 +153,21 @@ class SchemeService:
 
     @staticmethod
     def get_scheme(scheme_id: str) -> Optional[dict]:
+        """Return full scheme with eligibility, documents, benefits — not just card fields."""
         scheme = SchemeRepository.get_by_id(scheme_id)
         if not scheme:
             scheme = SchemeService._get_scheme_from_json(scheme_id)
-        return _scheme_card(scheme) if scheme else None
+        if not scheme:
+            return None
+        # Full detail response — include everything
+        card = _scheme_card(scheme)
+        card["eligibility"] = scheme.get("eligibility", {})
+        card["documents"]   = scheme.get("documents", [])
+        card["apply_at"]    = scheme.get("apply_at", [])
+        card["benefits"]    = scheme.get("benefits", {})
+        card["mismatch_checks"] = scheme.get("mismatch_checks", [])
+        card["bank_conditions"] = scheme.get("bank_conditions", {})
+        return card
 
     @staticmethod
     def _get_scheme_from_json(scheme_id: str) -> Optional[dict]:
@@ -279,21 +290,23 @@ class SchemeService:
                 return []
 
             current_tag  = current.get("tag", "").lower()
-            current_dept = current.get("department", "").lower()  # actual field
+            current_dept = current.get("department", "").lower()
 
             related = []
             for s in all_schemes:
+                # Strictly exclude the scheme being viewed
                 if s.get("scheme_id") == current_scheme_id:
                     continue
                 score = 0
                 if s.get("tag", "").lower() == current_tag:
                     score += 2
-                if s.get("department", "").lower() == current_dept:  # actual field
+                if s.get("department", "").lower() == current_dept:
                     score += 1
                 if score > 0:
                     related.append((score, s))
 
             related.sort(key=lambda x: x[0], reverse=True)
+            # Return cards — guaranteed to NOT include current_scheme_id
             return [_scheme_card(s) for _, s in related[:limit]]
 
         except Exception as e:
@@ -301,9 +314,24 @@ class SchemeService:
             return []
 
     @staticmethod
-    # def _query_based(query: str, limit: int) -> list:
-    #     result = SchemeService._search_from_json(query, "", 1, limit)
-    #     return [_scheme_card(s) for s in result.get("schemes", [])]
+    def _query_based(query: str, limit: int) -> list:
+        """Search all schemes in-memory by query text."""
+        try:
+            all_schemes = SchemeService._load_all_from_dynamo()
+            q = query.lower()
+            matched = [
+                s for s in all_schemes
+                if q in s.get("scheme_name", "").lower()
+                or q in s.get("scheme_name_bn", "").lower()
+                or q in s.get("tag", "").lower()
+                or q in s.get("benefit_display", "").lower()
+                or q in str(s.get("benefits", {}).get("note_en", "")).lower()
+                or q in s.get("department", "").lower()
+            ]
+            return [_scheme_card(s) for s in matched[:limit]]
+        except Exception as e:
+            logger.error(f"_query_based: {e}")
+            return []
 
     @staticmethod
     def get_all_schemes() -> list:

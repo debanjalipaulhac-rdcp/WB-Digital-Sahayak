@@ -21,8 +21,9 @@ from src.channels.whatsapp import router as whatsapp_router
 from src.channels.auth_controller    import router as auth_router
 from src.channels.schemes_controller import router as schemes_router
 from src.channels.profile_controller import router as profile_router
+from src.config.secrets_loader import load_secrets
 
-
+load_secrets()
 # ─────────────────────────────────────────────
 # LOGGING
 # ─────────────────────────────────────────────

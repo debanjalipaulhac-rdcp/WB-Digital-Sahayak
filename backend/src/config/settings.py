@@ -36,8 +36,17 @@ class Settings:
     # ── AWS Core ──────────────────────────────────────────────────────────────
     AWS_REGION: str             = os.getenv("AWS_REGION", "ap-south-1")
     AWS_ACCESS_KEY_ID: str      = os.getenv("AWS_ACCESS_KEY_ID", "")
-    AWS_SECRET_ACCESS_KEY: str  = os.getenv("AWS_SECRET_ACCESS_KEY", "")
 
+    AWS_SECRET_ACCESS_KEY: str  = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    JWT_SECRET_KEY: str         = os.getenv("JWT_SECRET_KEY", "wb-sahayak-super-secret-key-change-in-prod-2024")
+    JWT_ALGORITHM: str          = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_ACCESS_TOKEN_DAYS: int = 7
+    JWT_REFRESH_TOKEN_DAYS: int = 30
+    OTP_EXPIRE_SECONDS: str         = os.getenv("OTP_EXPIRE_SECONDS", "3600")
+    OTP_MAX_ATTEMPTS: str         = os.getenv("OTP_MAX_ATTEMPTS", "2")
+    OTP_LENGTH: str         = os.getenv("OTP_LENGTH", "6")
+    MOCK_OTP: str         = os.getenv("MOCK_OTP", "123456")
+    SMS_PROVIDER: str   = os.getenv("SMS_PROVIDER", "twilio")
     # ── S3 ────────────────────────────────────────────────────────────────────
     S3_BUCKET_NAME:str= os.getenv("S3_BUCKET_NAME", "wb-sahayak-audio")
     S3_AUDIO_CACHE_PREFIX: str  = os.getenv("S3_AUDIO_CACHE_PREFIX", "audio-cache/")
