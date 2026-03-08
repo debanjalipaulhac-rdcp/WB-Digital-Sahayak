@@ -7,7 +7,7 @@ Pure Python. Zero external calls.
 
 
 def detect_language(text: str) -> str:
-    """
+    r"""
     Detects language from raw text.
     Returns: "bn-IN" | "hi-IN" | "en-IN"
 
@@ -21,6 +21,7 @@ def detect_language(text: str) -> str:
     Language = whichever script has the most characters.
     Ties → default "en-IN"
     """
+
     bengali_count    = 0
     devanagari_count = 0
     latin_count      = 0

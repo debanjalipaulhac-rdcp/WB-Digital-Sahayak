@@ -21,8 +21,6 @@ def setup_logging():
     cw_client = boto3.client(
         "logs",
         region_name=settings.AWS_REGION,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
     )
 
     log_group = f"/wb-sahayak/{settings.ENV}"  # e.g. /wb-sahayak/production
