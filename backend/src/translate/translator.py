@@ -24,7 +24,6 @@ def get_short_lang_code(language_code: str) -> str:
     """
     return language_code.split("-")[0]
 
-
 def translate_text(
     text: str,
     source_language: str,

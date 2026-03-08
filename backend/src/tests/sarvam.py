@@ -15,12 +15,4 @@ audio = client.text_to_speech.convert(
 combined_audio = "".join(audio.audios)
 b64_file = base64.b64decode(combined_audio)
 print(b64_file[:4])
-# from pathlib import Path
 
-# BASE_DIR = Path(__file__).resolve().parent
-# file_path = BASE_DIR / "output1.opus"
-
-# with open(file_path, "wb") as f:
-#     f.write(b64_file)
-
-# print("Saved to:", file_path)
