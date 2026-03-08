@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["schemes"])
 
 
-# ── Request Models ────────────────────────────────────────────────────────────
-
 class ProfileInput(BaseModel):
     name:                  Optional[str]  = ""
     age:                   Optional[int]  = 0
@@ -189,9 +187,9 @@ def get_script(
     bank_name:    str = Query(""),
 ):
     """
-    Returns the exact Bengali/English/Hindi script the citizen should
-    speak at the government office to fix a specific issue.
-    Key in response is 'script' (NOT 'bn').
+        Returns the exact Bengali/English/Hindi script the citizen should
+        speak at the government office to fix a specific issue.
+        Key in response is 'script' (NOT 'bn').
     """
     try:
         from src.engine.eligibility import get_script

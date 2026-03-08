@@ -18,7 +18,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
-
+from src.config.logging_config import setup_logging
 from src.channels.whatsapp import router as whatsapp_router
 from src.channels.auth_controller    import router as auth_router
 from src.channels.schemes_controller import router as schemes_router
@@ -27,18 +27,14 @@ from src.channels.voice_controller import router as voice_router
 from src.config.secrets_loader import load_secrets
 
 load_secrets()
-# ─────────────────────────────────────────────
-# LOGGING
-# ─────────────────────────────────────────────
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 )
 logger = logging.getLogger(__name__)
+setup_logging()
 
-# ─────────────────────────────────────────────
-# APP
-# ─────────────────────────────────────────────
 app = FastAPI(
     title="WB Digital Sahayak",
     description="Voice-first West Bengal government scheme eligibility engine",
@@ -54,11 +50,8 @@ app.add_middleware(
 
 )
 
-# ─────────────────────────────────────────────
-# ROUTERS
-# ─────────────────────────────────────────────
+
 app.include_router(whatsapp_router, tags=["WhatsApp"])
-# app.include_router(api_router,      tags=["API"], prefix="/api/v1")
 app.include_router(auth_router,    prefix="/api/v1")
 app.include_router(schemes_router, prefix="/api/v1")
 app.include_router(profile_router, prefix="/api/v1")
@@ -69,7 +62,4 @@ def health():
     return {"status": "ok", "service": "WB Digital Sahayak"}
 
 
-# ─────────────────────────────────────────────
-# LAMBDA HANDLER
-# ─────────────────────────────────────────────
 handler = Mangum(app, lifespan="off")

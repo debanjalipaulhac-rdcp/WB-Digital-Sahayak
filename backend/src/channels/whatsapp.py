@@ -28,7 +28,14 @@ import threading
 import time
 import requests as http_requests
 from typing import Optional
-
+from src.config.cloudwatch import (
+    track_whatsapp_message_received,
+    track_voice_note_received,
+    track_eligibility_check_completed,
+    track_name_mismatch_detected,
+    track_session_started,
+    track
+)
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse
 
@@ -86,7 +93,9 @@ def _wa_number(phone: str) -> str:
 # ─────────────────────────────────────────────────────────────
 # WEBHOOK ENTRY POINT — returns 200 immediately
 # ─────────────────────────────────────────────────────────────
+
 @router.post("/webhook/whatsapp")
+@track("whatsapp_webhook")
 async def whatsapp_webhook(request: Request):
     """
     Receive Twilio webhook. Return 200 immediately.
@@ -112,7 +121,10 @@ async def whatsapp_webhook(request: Request):
             return PlainTextResponse("", status_code=200)
 
         logger.info(f"[webhook] from={phone} | text='{body[:40]}' | audio={bool(media_url)}")
-
+        track_whatsapp_message_received(phone)
+        if media_url:
+            track_voice_note_received()
+        track_session_started("whatsapp")
         # Fire background thread — never block Twilio
         thread = threading.Thread(
             target=_safe_pipeline,
