@@ -242,7 +242,7 @@ def _pipeline(phone: str, body: str, media_url: str, media_type: str):
         else:
             # Static miss → fall through to dynamic
             logger.info(f"[7] static MISS → escalating to dynamic")
-            response_text = _dynamic_path(text, language, decision)
+            response_text = _dynamic_path(text, language, is_voice)
 
     elif decision.intent == IntentType.ELIGIBILITY:
         # ELIGIBILITY PATH — deterministic engine
@@ -250,7 +250,7 @@ def _pipeline(phone: str, body: str, media_url: str, media_type: str):
 
     else:
         # DYNAMIC PATH — vector search + Nova Lite
-        response_text = _dynamic_path(text, language, decision)
+        response_text = _dynamic_path(text, language, is_voice)
 
     if not response_text:
         response_text = _t(
@@ -277,13 +277,16 @@ def _pipeline(phone: str, body: str, media_url: str, media_type: str):
 # PATH HANDLERS
 # ─────────────────────────────────────────────────────────────
 
-def _dynamic_path(text: str, language: str, decision) -> str:
+def _dynamic_path(text: str, language: str, is_voice) -> str:
     """
     Vector search + Nova Lite path.
     Returns English response text (translated by caller if needed).
     """
-    # Translate to English for keyword extraction if not already
-    en_text = translate_text(text, language, "en-IN") if language != "en-IN" else text
+    print(is_voice)
+    en_text=text
+    if is_voice==False:
+        # Translate to English for keyword extraction if not already
+        en_text = translate_text(text, language, "en-IN") if language != "en-IN" else text
 
     keywords      = extract_keywords(en_text)
     search_result = vector_search(keywords)

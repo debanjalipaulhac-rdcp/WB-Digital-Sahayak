@@ -4,7 +4,18 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import SchemeCard from '@/components/SchemeCard'
 import type { Scheme } from '@/types'
-
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { cn } from '@/lib/utils'
+import SchemeCard2 from './SchemeCard2'
 const GENDERS = [
   { value: 'female', label: 'Female', emoji: '👩' },
   { value: 'male', label: 'Male', emoji: '👨' },
@@ -75,86 +86,82 @@ export function QuickEligibilityFilter() {
 
   return (
     <div className="py-8">
-      {/* Section header */}
-      <div className="flex items-center gap-2 mb-5">
-        <span className="text-lg">🎯</span>
-        <div>
-          <h2 className="text-base font-bold m-0">FIND SCHEMES FOR YOU</h2>
-          <p className="text-xs text-muted-foreground m-0">
-            Select your details — see matching schemes instantly
-          </p>
-        </div>
-      </div>
-
-      {/* Filter pills row */}
-      <div className="flex flex-col gap-4 mb-6">
-        {/* Gender */}
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-            Gender
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            {GENDERS.map((g) => (
-              <button
-                key={g.value}
-                onClick={() => setGender((prev) => (prev === g.value ? '' : g.value))}
-                className={`px-4 py-2 rounded-full text-sm cursor-pointer flex items-center gap-1.5 transition-all ${
-                  gender === g.value
-                    ? 'border-2 border-blue-600 bg-blue-50 text-blue-800 font-semibold'
-                    : 'border border-border bg-transparent text-foreground font-normal'
-                }`}
-              >
-                <span>{g.emoji}</span> {g.label}
-              </button>
-            ))}
+      <div className="flex justify-between items-center">
+        {/* Section header */}
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
+          <span className="text-lg">🎯</span>
+          <div>
+            <h2 className="text-base font-bold m-0">FIND SCHEMES FOR YOU</h2>
+            <p className="text-xs text-muted-foreground m-0">
+              Select your details — see matching schemes instantly
+            </p>
           </div>
         </div>
 
-        {/* Caste */}
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-            Social Category
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            {CASTES.map((c) => (
-              <button
-                key={c.value}
-                onClick={() => setCaste((prev) => (prev === c.value ? '' : c.value))}
-                className={`px-4 py-2 rounded-full text-sm cursor-pointer transition-all ${
-                  caste === c.value
-                    ? 'border-2 border-blue-600 bg-blue-50 text-blue-800 font-semibold'
-                    : 'border border-border bg-transparent text-foreground font-normal'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Filter pills row */}
+        <div className="flex gap-4 mb-6">
+          {/* Gender */}
+          <div className='flex-wrap'>
+            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+              Gender
+            </p>
+            <Select onValueChange={(e) => setGender((prev) => (prev === e ? '' : e))}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {GENDERS.map((g) => (
+                    <SelectItem value={g.value} key={g.value}>
+                      {g.label}
+                    </SelectItem>
+                  ))}
 
-        {/* Age group */}
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-            Age Group
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            {AGE_GROUPS.map((a) => (
-              <button
-                key={a.value}
-                onClick={() => setAge((prev) => (prev === a.value ? '' : a.value))}
-                className={`px-4 py-2 rounded-full text-sm cursor-pointer transition-all ${
-                  age === a.value
-                    ? 'border-2 border-blue-600 bg-blue-50 text-blue-800 font-semibold'
-                    : 'border border-border bg-transparent text-foreground font-normal'
-                }`}
-              >
-                {a.label}
-              </button>
-            ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Caste */}
+          <div className='flex-wrap'>
+            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+              Social Category
+            </p>
+            <Select onValueChange={(e) => setCaste((prev) => (prev === e ? '' : e))}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Cast" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {CASTES.map((g) => (
+                    <SelectItem value={g.value} key={g.value}>
+                      {g.label}
+                    </SelectItem>
+                  ))}
+
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Age group */}
+          <div className='flex-wrap'>
+            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+              Age Group
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <RadioGroup defaultValue={age} onValueChange={(a) => setAge((prev) => (prev === a ? '' : a))} className='flex gap-4'>
+                {AGE_GROUPS.map((a) => (
+                  <label className={cn("flex items-center border rounded-full p-2 py-1.5 cursor-pointer", age === a.value && "border-blue-600 bg-secondary text-blue-800 font-semibold")} htmlFor={a.value}>
+                    <RadioGroupItem value={a.value} id={a.value} className='cursor-pointer' />
+                    <Label htmlFor={a.value} className='pl-3 cursor-pointer text-sm'>{a.label}</Label>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
           </div>
         </div>
       </div>
-
       {/* Results */}
       {!hasSearched && (
         <div className="text-center py-8 px-4 border border-dashed border-border rounded-xl text-muted-foreground text-sm">
@@ -179,7 +186,7 @@ export function QuickEligibilityFilter() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
             {schemes.slice(0, 6).map((s) => (
-              <SchemeCard key={s.scheme_id} scheme={s} />
+              <SchemeCard2 key={s.scheme_id} scheme={s} />
             ))}
           </div>
           <div className="text-center">

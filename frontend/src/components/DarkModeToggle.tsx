@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import Switch from './ui/toggle-switch'
 
 export default function DarkModeToggle() {
     const [dark, setDark] = useState(false)
@@ -28,14 +29,9 @@ export default function DarkModeToggle() {
     }
 
     return (
-        <button
-            onClick={toggle}
-            className="dark-toggle"
-            aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-            style={{ position: 'relative' }}
-        >
-            <Moon size={18} color="#374151" className="icon-moon" />
-            <Sun size={18} color="#FCD34D" className="icon-sun" />
-        </button>
+
+
+        <Switch toggle={toggle} />
+
     )
 }

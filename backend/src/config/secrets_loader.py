@@ -15,7 +15,6 @@ def load_secrets():
         client = boto3.client("secretsmanager", region_name=region)
         response = client.get_secret_value(SecretId=secret_name)
         secrets = json.loads(response["SecretString"])
-        print(secrets.items())
         # Inject into environment
         for key, value in secrets.items():
             os.environ[key] = value

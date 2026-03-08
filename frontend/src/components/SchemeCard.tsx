@@ -1,6 +1,7 @@
 import { Bike, GraduationCap, Award, ExternalLink, LucideIcon } from 'lucide-react'
 import type { Scheme } from '@/types'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
 const ICON_MAP: Record<string, LucideIcon> = { Bike, GraduationCap, Award }
 
@@ -19,9 +20,10 @@ const TAG_STYLES: Record<string, string> = {
 
 interface SchemeCardProps {
     scheme: Scheme
+    gradient?:boolean
 }
 
-export default function SchemeCard({ scheme }: SchemeCardProps) {
+export default function SchemeCard({ scheme,gradient=false }: SchemeCardProps) {
     const id = scheme.scheme_id || ''
     const label = scheme.name || scheme.scheme_name || ''
     const tag = scheme.tag || ''
@@ -33,40 +35,43 @@ export default function SchemeCard({ scheme }: SchemeCardProps) {
     const tagCls = TAG_STYLES[tag] || TAG_STYLES['SCHEME']
 
     return (
-        <Link href={`/schemes/${id}`} className="bg-secondary rounded-xl p-4 hover:-translate-0.5 transform-3d translate-0 transition-all">
+        <Link href={`/schemes/${id}`} className=" bg-linear-45 to-foreground/70 from-muted flex p-px rounded-xl  hover:scale-99  transition-all">
             {/* Top row: icon + tag */}
-            <div className="flex items-start justify-between">
-                <div className="w-12 h-12 bg-primary-foreground rounded-md flex items-center justify-center shrink-0">
-                    <IconComponent size={24} className="text-primary" />
+            <div className={cn("bg-secondary rounded-xl p-4 relative flex flex-col ","")}>
+
+                <div className="flex items-start justify-between shrink">
+                    <div className="w-12 h-12 bg-primary-foreground rounded-md flex items-center justify-center shrink-0">
+                        <IconComponent size={24} className="text-primary" />
+                    </div>
+                    {tag && (
+                        <span className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded ${tagCls}`}>
+                            {tag.replace('_', ' ')}
+                        </span>
+                    )}
                 </div>
-                {tag && (
-                    <span className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded ${tagCls}`}>
-                        {tag.replace('_', ' ')}
-                    </span>
+
+                {/* Scheme name */}
+                <div className="font-semibold text-[17px]  mt-3 leading-snug shrink">
+                    {label}
+                </div>
+
+                {/* Benefit pill */}
+                {scheme.benefit_display && (
+                    <div className="mt-1.5 text-xs font-semibold text-primary bg-primary-foreground rounded px-2 py-0.5 w-fit">
+                        {scheme.benefit_display}
+                    </div>
                 )}
-            </div>
 
-            {/* Scheme name */}
-            <div className="font-semibold text-[17px]  mt-3 leading-snug">
-                {label}
-            </div>
+                {/* Description */}
+                <p className=" text-sm text-muted-foreground mt-2 leading-relaxed grow line-clamp-3">
+                    {desc}
+                </p>
 
-            {/* Benefit pill */}
-            {scheme.benefit_display && (
-                <div className="mt-1.5 text-xs font-semibold text-primary bg-primary-foreground rounded px-2 py-0.5 w-fit">
-                    {scheme.benefit_display}
+                {/* Footer */}
+                <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                    <span className="text-[11px] text-muted-foregroundleading-tight">{dept}</span>
+                    <ExternalLink size={14} className="text-primary/60 group-hover:text-blue-700 transition-colors" />
                 </div>
-            )}
-
-            {/* Description */}
-            <p className=" text-sm text-muted-foreground mt-2 leading-relaxed grow line-clamp-3">
-                {desc}
-            </p>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between mt-4 pt-3 border-t">
-                <span className="text-[11px] text-muted-foregroundleading-tight">{dept}</span>
-                <ExternalLink size={14} className="text-primary/60 group-hover:text-blue-700 transition-colors" />
             </div>
         </Link>
     )

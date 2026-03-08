@@ -431,6 +431,10 @@ body {
   }
 }
 
+.gradient-card {
+  background: radial-gradient(at 85.51724121488374% 24.041666984558105%, #a5e1f4 0px, transparent 50%), radial-gradient(at 11.37931018040098% 22.166666984558105%, #87c3def3 0px, transparent 50%), radial-gradient(at 89.9353446631596% 78.20833365122478%, #75a5ea 0px, transparent 50%), radial-gradient(at 87.67241362867684% 85.50000031789143%, #20bdedf3 0px, transparent 50%), radial-gradient(at 17.62931018040098% 82.1666653951009%, #ecebfc90 0px, transparent 50%), radial-gradient(at 4.482758456263049% 75.9166653951009%, #ffffff09 0px, transparent 50%), radial-gradient(at 42.62931018040098% 52.37499872843424%, #ffffff23 50%), radial-gradient(at 35.84051707695271% 22.166665395100914%, #ffffffa2 0px, transparent 50%), #e5fbff6d;
+}
+
 /* ── Dark Mode ── */
 .dark {
   --color-bg: #111827;
@@ -991,9 +995,11 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-mono;
   }

@@ -30,30 +30,29 @@ export default async function HomePage() {
         <div className="min-h-screen bg-background">
 
             {/* ── HERO ── */}
-            <section className="bg-linear-180 from-primary/90 to-primary py-16 px-5 text-center">
-                <div className="max-w-2xl mx-auto">
+            <section className="bg-linear-0 from-background to-primary py-16 px-5 text-center">
+                <div className="max-w-2xl mx-auto pb-10">
 
                     {/* Pill badge */}
-                    <div className="animate-fade-up inline-block border border-accent-foreground rounded-full px-4 py-1 mb-5">
+                    <div className="animate-fade-up inline-block border border-white/70 rounded-full px-4 py-1 mb-5">
                         <span className="text-xs font-semibold tracking-widest uppercase text-white">
                             {tx.hero_badge}
                         </span>
                     </div>
 
                     {/* H1 */}
-                    <h1 className="animate-fade-up delay-1 text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-4">
+                    <h1 className="animate-fade-up delay-1 text-3xl sm:text-4xl lg:text-5xl font-bold  leading-tight mb-4">
                         {tx.hero_title}
                     </h1>
 
                     {/* Subtitles */}
-                    <p className="bn-text animate-fade-up delay-1 text-base text-white/85 mb-1">
+                    <p className="bn-text animate-fade-up delay-1 text-base mb-1">
                         {tx.hero_subtitle_bn}
                     </p>
-                    <p className="animate-fade-up delay-2 text-sm text-white/75 mb-8">
+                    <p className="animate-fade-up delay-2 text-sm mb-8">
                         {tx.hero_subtitle}
                     </p>
-                    <div className="m-auto inline-block">
-
+                    <div className="">  
                         {/* SearchBar */}
                         <SearchBar showEligibilityTrigger />
                     </div>
@@ -64,7 +63,7 @@ export default async function HomePage() {
                             <Link
                                 key={chip}
                                 href={`/search?q=${encodeURIComponent(chip)}`}
-                                className={`opactity-0 rounded-full border border-gray-300 animate-fade-up delay-${i + 1} text-white`}
+                                className={`opactity-0 rounded-full border border-foreground animate-fade-up delay-${i + 1}`}
                             >
                                 <span className="text-xs tracking-wide uppercase p-4">
                                     {chip}
@@ -113,7 +112,7 @@ export default async function HomePage() {
                     ))}
                 </div>
             </section>
-            <div className="h-8"/>
+            <div className="h-8" />
         </div>
     )
 }
