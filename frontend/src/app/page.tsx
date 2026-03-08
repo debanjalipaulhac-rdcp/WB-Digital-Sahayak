@@ -23,7 +23,7 @@ export default async function HomePage() {
     const data = await getSchemes({ page_size: 8, sort: 'relevance' })
     const schemes = data?.schemes || []
 
-    const stats = (tx.stats as string[]) || ['50+', '2M+', '100%', '24/7']
+    const stats = (tx.stats as string[]) || ['50+', '2M+', '98%', '24/7']
     const statLabels = (tx.stat_labels as string[]) || ['Active Schemes', 'Beneficiaries', 'Digital Process', 'Support Access']
 
     return (

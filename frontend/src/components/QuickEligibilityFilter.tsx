@@ -152,7 +152,7 @@ export function QuickEligibilityFilter() {
             <div className="flex gap-2 flex-wrap">
               <RadioGroup defaultValue={age} onValueChange={(a) => setAge((prev) => (prev === a ? '' : a))} className='flex gap-4'>
                 {AGE_GROUPS.map((a) => (
-                  <label className={cn("flex items-center border rounded-full p-2 py-1.5 cursor-pointer", age === a.value && "border-blue-600 bg-secondary text-blue-800 font-semibold")} htmlFor={a.value}>
+                  <label className={cn("flex items-center border rounded-full p-2 py-1.5 cursor-pointer", age === a.value && "border-blue-600 bg-secondary text-blue-800 font-semibold")} htmlFor={a.value} key={a.value}>
                     <RadioGroupItem value={a.value} id={a.value} className='cursor-pointer' />
                     <Label htmlFor={a.value} className='pl-3 cursor-pointer text-sm'>{a.label}</Label>
                   </label>

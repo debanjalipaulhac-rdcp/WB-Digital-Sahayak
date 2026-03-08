@@ -42,7 +42,7 @@ const translations: Record<string, Translations> = {
         recommended_sub: 'Based on your age, location, and caste, we can find schemes tailored just for you.',
         check_eligibility: 'Check Eligibility',
         view_all: 'View all',
-        stats: ['50+', '2M+', '100%', '24/7'],
+        stats: ['50+', '2M+', '98%', '24/7'],
         stat_labels: ['Active Schemes', 'Beneficiaries', 'Digital Process', 'Support Access'],
         active_scheme: 'Active Scheme',
         scheme_benefits: 'Scheme Benefits',
